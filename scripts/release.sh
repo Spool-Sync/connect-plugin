@@ -5,8 +5,10 @@
 #
 #   sh scripts/release.sh            -> dist/spool-sync-prusa-connect-<version>.tar.gz
 #   TAG=v0.1.0 sh scripts/release.sh -> also fails unless the tag is v<version>
-#   SUFFIX=dev.42 sh scripts/release.sh -> version <version>-dev.42, written
-#     into the archive's module.yaml, for a build of main that is no release
+#   DEV_BUILD=42 sh scripts/release.sh -> for a build of main that is no
+#     release: version MAJOR.MINOR.(100000+42), such as 0.1.100042, written
+#     into the archive's module.yaml and the binary. The host's handshake
+#     takes MAJOR.MINOR.PATCH only, so a prerelease suffix cannot be used.
 #
 # Install it with
 #   prusa-connect module add gitlab.honex.life/spoolsync/spool-sync-prusa-connect@<version> -from dist/<archive> -approve
@@ -35,12 +37,21 @@ if [ -z "$PLATFORMS" ]; then
   exit 1
 fi
 
-if [ -n "${SUFFIX:-}" ]; then
+case "$VERSION" in
+  *[!0-9.]* | *.*.*.* | .* | *.)
+    echo "release: module.yaml's version $VERSION is not MAJOR.MINOR.PATCH" >&2
+    exit 1 ;;
+esac
+
+if [ -n "${DEV_BUILD:-}" ]; then
   if [ -n "${TAG:-}" ]; then
-    echo "release: a tag is a release, and SUFFIX is for builds that are not" >&2
+    echo "release: a tag is a release, and DEV_BUILD is for builds that are not" >&2
     exit 1
   fi
-  VERSION="$VERSION-$SUFFIX"
+  case "$DEV_BUILD" in
+    '' | *[!0-9]*) echo "release: DEV_BUILD must be a whole number, not $DEV_BUILD" >&2; exit 1 ;;
+  esac
+  VERSION="${VERSION%.*}.$((100000 + DEV_BUILD))"
 fi
 
 OUT=dist/release

@@ -4,9 +4,10 @@
 # Every MR and main push: vet, test and build the release archive.
 #
 # main  -> deploy:connect installs the build on connect.honex.life. A main
-#          build is version <module.yaml version>-dev.<pipeline iid>, so each
-#          push is a new release to Connect and a tagged <version> is newer
-#          than all of them. Connect downloads only over public https, so the
+#          build is version MAJOR.MINOR.(100000 + pipeline iid), so each
+#          push is a new, higher release to Connect. The handshake takes
+#          MAJOR.MINOR.PATCH only, so no -dev suffix. Tags never deploy here,
+#          so a tagged 0.1.1 sorting below 0.1.100006 does not matter. Connect downloads only over public https, so the
 #          archive goes through the Honex CDN under one stable name, fetched
 #          with ?build=<pipeline iid> so Cloudflare never serves an older one:
 #            https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-dev.tar.gz
@@ -75,7 +76,7 @@ build:
       if [ -n "${CI_COMMIT_TAG:-}" ]; then
         TAG="$CI_COMMIT_TAG" sh scripts/release.sh
       else
-        SUFFIX="dev.$CI_PIPELINE_IID" sh scripts/release.sh
+        DEV_BUILD="$CI_PIPELINE_IID" sh scripts/release.sh
       fi
   artifacts:
     name: "spool-sync-prusa-connect-$CI_COMMIT_SHORT_SHA"

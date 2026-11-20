@@ -63,13 +63,14 @@ go mod edit -replace github.com/prusa3d/prusa-connect/sdk=../prusa-connect/sdk
 
 `sh scripts/release.sh` builds `dist/spool-sync-prusa-connect-<version>.tar.gz`,
 the archive Prusa Connect installs, and its sha256 beside it.
-`SUFFIX=dev.42` builds `<version>-dev.42` instead, for a build that is no
-release.
+`DEV_BUILD=42` builds `MAJOR.MINOR.100042` instead, for a build that is no
+release. Connect's handshake takes `MAJOR.MINOR.PATCH` only, so a dev build
+cannot carry a `-dev` suffix.
 
 CI tests and builds every MR and push. Then:
 
 - **main** is installed on `connect.honex.life` (job `deploy:connect`), as
-  `<version>-dev.<pipeline>`. The archive goes through the Honex CDN as
+  `MAJOR.MINOR.(100000 + pipeline number)`, such as `0.1.100006`. The archive goes through the Honex CDN as
   `spool-sync-prusa-connect-dev.tar.gz`, because Connect downloads only over
   public https. Installing over the installed build is the update: settings
   and the SpoolSync token are kept.
