@@ -1,0 +1,66 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "spool-sync-prusa-connect",
+    "version": "0.1.0",
+    "description": "The routes spool-sync-prusa-connect serves. Every path is relative to the mount the host assigns."
+  },
+  "paths": {
+    "/status": {
+      "get": {
+        "operationId": "read-sync-status",
+        "summary": "What the sync has done",
+        "description": "Whether the module is configured, and what the sync loop has done since it last started. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The sync status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "configured"
+                  ],
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                      "description": "Whether a SpoolSync address and token are set."
+                    },
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "pushed": {
+                          "type": "integer",
+                          "description": "Spool weights checked against SpoolSync and set where they differed."
+                        },
+                        "unknown": {
+                          "type": "integer",
+                          "description": "Tagged spools SpoolSync holds no spool for, at the last ask."
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "description": "Steps that failed: a read of Materials, the event stream, or a SpoolSync call."
+                        },
+                        "last_push": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "last_error": {
+                          "type": "string"
+                        },
+                        "last_full_sync": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

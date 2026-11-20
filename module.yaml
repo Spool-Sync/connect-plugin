@@ -1,0 +1,78 @@
+# The manifest for spool-sync-prusa-connect, a module that is the Go process in main.go and
+# nothing else. There is no ui block, so it draws nothing in the app.
+#
+# `prusa-connect module add` reads it out of the release and writes one
+# declaration from it.
+#
+# The namespace is absent on purpose. The host derives it from the repository
+# address the operator installed, so no module can name another module's
+# address. For this module that is life.honex.gitlab.aux.spoolsync.spool-sync-prusa-connect.
+
+name: spool-sync-prusa-connect
+# The kind the one instance is declared under. It offers the service runtime,
+# which is what a module with a process needs.
+kind: sink
+version: 0.1.0
+# The licence this module is released under. The marketplace shows it and
+# refuses a release without one. An SPDX identifier is the usual form.
+license: MIT
+# What a marketplace card prints beside the name: the title a person reads,
+# one sentence about this module, and who answers for it. The install copies
+# them into the declaration, so `GET /api/v1/resources` carries them for an
+# installed module. Write your own sentence here, a title if the name alone reads badly, and your name or
+# your team's beside it.
+title: SpoolSync
+summary: Keeps the weight of NFC-tagged spools in SpoolSync in step with what Prusa printers report.
+codeowner: SpoolSync
+# The module wire major the process half speaks.
+contract_major: 1
+# Where the fragment describing the routes is, inside this repository.
+openapi: openapi.json
+# The platforms the release ships a binary for, each a GOOS_GOARCH pair. Drop
+# the ones you do not build, and add the ones you do.
+platforms:
+  - linux_amd64
+  - linux_arm64
+  - darwin_arm64
+  - windows_amd64
+
+# Every setting this module reads, each with its type, its default and one
+# sentence saying what it controls. The host sends them on plugin.configure.
+options:
+  - key: spoolsync_url
+    type: url
+    required: true
+    summary: The address of the SpoolSync server, such as https://spools.example.net, without /api/v1.
+  - key: spoolsync_token
+    type: secret
+    required: true
+    summary: A SpoolSync API token (ss_...) with the spools:view and spools:edit permissions.
+  - key: materials_module
+    type: string
+    default: "com.github.aux.prusa3d.materials"
+    summary: The namespace of the Materials module whose spools are followed.
+
+# Materials holds the spools; this module follows it and does nothing without it.
+suggest:
+  com.github.aux.prusa3d.materials: "The spools printers read off their NFC tags, and their weight"
+calls:
+  - com.github.aux.prusa3d.materials
+
+require:
+  core-bus.subscribe: "*"
+  core-routes.call: "*"
+
+# The one connection outside Prusa Connect: the SpoolSync server the operator names.
+egress:
+  - option: spoolsync_url
+    why: Sets the weight of each NFC-tagged spool in the operator's SpoolSync inventory.
+    sends: The OpenPrintTag instance UUID of each tagged spool and its weight in grams.
+
+# The sync loop runs as this module, with nobody behind it: it reads Materials'
+# spools and subscribes to its spool events.
+permissions:
+  - observe
+
+# The memory in MiB the server may budget for the process, children included.
+# needs:
+#   memory_mib: 256
