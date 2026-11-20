@@ -58,7 +58,7 @@ for p in $PLATFORMS; do
   ext=
   [ "$os" = windows ] && ext=.exe
   echo "build $NAME for $os/$arch"
-  CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w" -o "$OUT/${NAME}_$p$ext" .
+  CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o "$OUT/${NAME}_$p$ext" .
 done
 
 # checksums.txt lists every other file, so it is written last.

@@ -44,10 +44,14 @@ import (
 
 // What this child reports when the host asks it what it is. The name is the
 // manifest's, and the host holds the two to each other.
-const (
-	name    = "spool-sync-prusa-connect"
-	release = extension.Version("0.1.0")
-)
+const name = "spool-sync-prusa-connect"
+
+// version is module.yaml's version. scripts/release.sh overwrites it with
+// -ldflags "-X main.version=...", so a dev build answers the version its
+// archive's manifest carries, such as 0.1.0-dev.4.
+var version = "0.1.0"
+
+var release = extension.Version(version)
 
 // defaultMaterials is the namespace of the Materials module from the official
 // release. It is the default of the materials_module setting in module.yaml.

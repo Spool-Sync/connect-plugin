@@ -97,4 +97,11 @@ func TestTheManifestParses(t *testing.T) {
 	if held.Name != name {
 		t.Fatalf("module.yaml names %q, the code %q", held.Name, name)
 	}
+
+	// The host refuses a child whose version is not its manifest's. A release
+	// build stamps version from the archive's manifest; this default is what a
+	// plain go build answers, so it has to be module.yaml's own.
+	if string(held.Version) != version {
+		t.Fatalf("module.yaml says version %q, main.go defaults to %q", held.Version, version)
+	}
 }
