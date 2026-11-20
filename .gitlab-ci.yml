@@ -1,0 +1,139 @@
+# ---------------------------------------------------------------------------
+# spool-sync-prusa-connect: GitLab CI/CD
+#
+# Every MR and main push: vet, test and build the release archive.
+# A v* tag also publishes it to the Honex CDN (cdn.honex.life, namespace
+# `spool-sync`), as kubenova-desktop does:
+#
+#   file  https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz
+#   KV    https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
+#         {module, version, url, sha256, commit, published_at}
+#
+# Each release keeps its own file name, so a URL and its sha256 never drift
+# apart: Prusa Connect's POST /api/v1/modules takes exactly that pair.
+#
+# The tag must be v<version in module.yaml>; build fails otherwise.
+#
+# Runners follow the honex-ci conventions: hetzner-* are fresh Hetzner VMs.
+#
+# Requires (masked + protected, so v* tags are protected):
+#   HONEX_CDN_TOKEN   cdnkey.* token scoped to the `spool-sync` namespace
+# ---------------------------------------------------------------------------
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+default:
+  interruptible: true
+
+stages:
+  - test
+  - build
+  - publish
+
+.go: &go
+  image: golang:1.26-bookworm
+  tags: [hetzner-small]
+  variables:
+    GOFLAGS: -mod=readonly
+
+.rules: &rules
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
+  - if: $CI_COMMIT_TAG =~ /^v[0-9]/
+  - if: $CI_PIPELINE_SOURCE == "web"
+
+test:
+  <<: *go
+  stage: test
+  timeout: 20m
+  rules: *rules
+  script:
+    - go vet ./...
+    - go test -race ./...
+
+build:
+  <<: *go
+  stage: build
+  timeout: 20m
+  rules: *rules
+  needs: [test]
+  script:
+    - TAG="${CI_COMMIT_TAG:-}" sh scripts/release.sh
+  artifacts:
+    name: "spool-sync-prusa-connect-$CI_COMMIT_SHORT_SHA"
+    expire_in: 30 days
+    paths:
+      - dist/*.tar.gz
+      - dist/*.tar.gz.sha256
+
+publish:
+  stage: publish
+  tags: [hetzner-small]
+  image: alpine:3.22
+  # A release upload must never be cut off half-way by a newer push.
+  interruptible: false
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v[0-9]/
+  needs:
+    - job: build
+      artifacts: true
+  variables:
+    CDN_BASE: "https://cdn.honex.life"
+    CDN_NS: "spool-sync"
+    KV_KEY: "spool-sync-prusa-connect"
+    MODULE: "gitlab.honex.life/spoolsync/spool-sync-prusa-connect"
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      set -eu
+      if [ -z "${HONEX_CDN_TOKEN:-}" ]; then
+        echo "publish: HONEX_CDN_TOKEN is not set (is the tag protected?)" >&2
+        exit 1
+      fi
+
+      VERSION="${CI_COMMIT_TAG#v}"
+      ARCHIVE="dist/spool-sync-prusa-connect-$VERSION.tar.gz"
+      [ -f "$ARCHIVE" ] || { echo "publish: $ARCHIVE is missing" >&2; exit 1; }
+      NAME=$(basename "$ARCHIVE")
+      SHA256=$(cat "$ARCHIVE.sha256")
+      URL="$CDN_BASE/file/$CDN_NS/$NAME"
+
+      echo "Uploading $NAME"
+      curl -fsS -X POST \
+        -H "Authorization: $HONEX_CDN_TOKEN" \
+        -F "file=@$ARCHIVE" \
+        --form-string "filename=$NAME" \
+        "$CDN_BASE/api/cdn/files/$CDN_NS" \
+        -o /dev/null
+
+      # The CDN must serve back the bytes the sha256 names, or an install
+      # from the KV entry would be refused with MODULE_DIGEST_MISMATCH.
+      GOT=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+      if [ "$GOT" != "$SHA256" ]; then
+        echo "publish: $URL serves sha256 $GOT, the build made $SHA256" >&2
+        exit 1
+      fi
+
+      latest=$(jq -n \
+        --arg module  "$MODULE" \
+        --arg version "$VERSION" \
+        --arg url     "$URL" \
+        --arg sha256  "$SHA256" \
+        --arg commit  "$CI_COMMIT_SHA" \
+        --arg date    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{module: $module, version: $version, url: $url, sha256: $sha256, commit: $commit, published_at: $date}')
+      echo "$latest"
+
+      jq -n --arg key "$KV_KEY" --arg value "$latest" '{key: $key, value: $value, type: "json"}' |
+        curl -fsS -X POST \
+          -H "Authorization: $HONEX_CDN_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data-binary @- \
+          "$CDN_BASE/api/cdn/kv/$CDN_NS" \
+          -o /dev/null
+
+      echo "Published $VERSION: $URL"
+      echo "Latest: $CDN_BASE/value-store/$CDN_NS/$KV_KEY"

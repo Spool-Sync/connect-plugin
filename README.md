@@ -59,6 +59,35 @@ It builds against `github.com/prusa3d/prusa-connect/sdk` at the version in
 go mod edit -replace github.com/prusa3d/prusa-connect/sdk=../prusa-connect/sdk
 ```
 
+## Release and install
+
+`sh scripts/release.sh` builds `dist/spool-sync-prusa-connect-<version>.tar.gz`,
+the archive Prusa Connect installs, and its sha256 beside it. CI does the same
+on every push, and a `v<version>` tag also publishes it to the Honex CDN:
+
+| what | where |
+| --- | --- |
+| the archive | `https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz` |
+| the latest release | `https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect`, as `{module, version, url, sha256, commit, published_at}` |
+
+To release, set `version` in `module.yaml`, add it to `CHANGELOG.md`, and push
+the tag `v<version>`. A tag that does not match `module.yaml` fails the build.
+Publishing needs `HONEX_CDN_TOKEN`, a masked and protected CI variable holding
+a CDN key scoped to the `spool-sync` namespace, so `v*` tags are protected.
+
+Install or update a server from the latest release:
+
+```sh
+curl -fsS https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect |
+  jq '{module, version, from: .url, sha256, approve: true}' |
+  curl -fsS -X POST https://connect.example.net/api/v1/modules \
+    -H "Authorization: Bearer $CONNECT_ADMIN_TOKEN" \
+    -H "Content-Type: application/json" --data-binary @-
+```
+
+Installing over an installed release is the update. The settings and the
+token are kept.
+
 ## Known limits
 
 - One way only.
