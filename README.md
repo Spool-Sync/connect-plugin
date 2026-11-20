@@ -62,20 +62,31 @@ go mod edit -replace github.com/prusa3d/prusa-connect/sdk=../prusa-connect/sdk
 ## Release and install
 
 `sh scripts/release.sh` builds `dist/spool-sync-prusa-connect-<version>.tar.gz`,
-the archive Prusa Connect installs, and its sha256 beside it. CI does the same
-on every push, and a `v<version>` tag also publishes it to the Honex CDN:
+the archive Prusa Connect installs, and its sha256 beside it.
+`SUFFIX=dev.42` builds `<version>-dev.42` instead, for a build that is no
+release.
 
-| what | where |
-| --- | --- |
-| the archive | `https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz` |
-| the latest release | `https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect`, as `{module, version, url, sha256, commit, published_at}` |
+CI tests and builds every MR and push. Then:
 
-To release, set `version` in `module.yaml`, add it to `CHANGELOG.md`, and push
-the tag `v<version>`. A tag that does not match `module.yaml` fails the build.
-Publishing needs `HONEX_CDN_TOKEN`, a masked and protected CI variable holding
-a CDN key scoped to the `spool-sync` namespace, so `v*` tags are protected.
+- **main** is installed on `connect.honex.life` (job `deploy:connect`), as
+  `<version>-dev.<pipeline>`. The archive goes through the Honex CDN as
+  `spool-sync-prusa-connect-dev.tar.gz`, because Connect downloads only over
+  public https. Installing over the installed build is the update: settings
+  and the SpoolSync token are kept.
+- **a `v<version>` tag** is published for installs elsewhere, and deploys
+  nothing. A tag that does not match `module.yaml` fails the build.
 
-Install or update a server from the latest release:
+  | what | where |
+  | --- | --- |
+  | the archive | `https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz` |
+  | the latest release | `https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect`, as `{module, version, url, sha256, commit, published_at}` |
+
+CI needs two masked variables: `HONEX_CDN_TOKEN`, a CDN key scoped to the
+`spool-sync` namespace, and `CONNECT_ADMIN_TOKEN`, a Connect token with the
+admin role. A protected variable reaches only protected refs, so protect `v*`
+tags if `HONEX_CDN_TOKEN` is protected.
+
+Install or update another server from the latest published release:
 
 ```sh
 curl -fsS https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect |
@@ -84,9 +95,6 @@ curl -fsS https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
     -H "Authorization: Bearer $CONNECT_ADMIN_TOKEN" \
     -H "Content-Type: application/json" --data-binary @-
 ```
-
-Installing over an installed release is the update. The settings and the
-token are kept.
 
 ## Known limits
 

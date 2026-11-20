@@ -5,6 +5,8 @@
 #
 #   sh scripts/release.sh            -> dist/spool-sync-prusa-connect-<version>.tar.gz
 #   TAG=v0.1.0 sh scripts/release.sh -> also fails unless the tag is v<version>
+#   SUFFIX=dev.42 sh scripts/release.sh -> version <version>-dev.42, written
+#     into the archive's module.yaml, for a build of main that is no release
 #
 # Install it with
 #   prusa-connect module add gitlab.honex.life/spoolsync/spool-sync-prusa-connect@<version> -from dist/<archive> -approve
@@ -33,12 +35,22 @@ if [ -z "$PLATFORMS" ]; then
   exit 1
 fi
 
+if [ -n "${SUFFIX:-}" ]; then
+  if [ -n "${TAG:-}" ]; then
+    echo "release: a tag is a release, and SUFFIX is for builds that are not" >&2
+    exit 1
+  fi
+  VERSION="$VERSION-$SUFFIX"
+fi
+
 OUT=dist/release
 ARCHIVE=dist/$NAME-$VERSION.tar.gz
 
 rm -rf dist
 mkdir -p "$OUT"
-cp module.yaml openapi.json "$OUT/"
+cp openapi.json "$OUT/"
+sed "s/^version: .*/version: $VERSION/" module.yaml > "$OUT/module.yaml"
+echo "$VERSION" > dist/version
 
 for p in $PLATFORMS; do
   os=${p%_*}

@@ -2,24 +2,28 @@
 # spool-sync-prusa-connect: GitLab CI/CD
 #
 # Every MR and main push: vet, test and build the release archive.
-# A v* tag also publishes it to the Honex CDN (cdn.honex.life, namespace
-# `spool-sync`), as kubenova-desktop does:
 #
-#   file  https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz
-#   KV    https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
-#         {module, version, url, sha256, commit, published_at}
+# main  -> deploy:connect installs the build on connect.honex.life. A main
+#          build is version <module.yaml version>-dev.<pipeline iid>, so each
+#          push is a new release to Connect and a tagged <version> is newer
+#          than all of them. Connect downloads only over public https, so the
+#          archive goes through the Honex CDN under one stable name, fetched
+#          with ?build=<pipeline iid> so Cloudflare never serves an older one:
+#            https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-dev.tar.gz
 #
-# Each release keeps its own file name, so a URL and its sha256 never drift
-# apart: Prusa Connect's POST /api/v1/modules takes exactly that pair.
-#
-# The tag must be v<version in module.yaml>; build fails otherwise.
-# After publishing, deploy installs that release on connect.honex.life.
+# v*    -> publish puts the release on the Honex CDN for published builds
+#          (installs elsewhere). Nothing is deployed from a tag.
+#            file https://cdn.honex.life/file/spool-sync/spool-sync-prusa-connect-<version>.tar.gz
+#            KV   https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
+#                 {module, version, url, sha256, commit, published_at}
+#          The tag must be v<version in module.yaml>; build fails otherwise.
 #
 # Runners follow the honex-ci conventions: hetzner-* are fresh Hetzner VMs.
 #
-# Requires (masked + protected, so v* tags are protected):
+# Requires:
 #   HONEX_CDN_TOKEN      cdnkey.* token scoped to the `spool-sync` namespace
-#   CONNECT_ADMIN_TOKEN  Connect token with the admin role (deploy)
+#                        (masked; if protected, protect v* tags too)
+#   CONNECT_ADMIN_TOKEN  Connect token with the admin role (masked)
 # ---------------------------------------------------------------------------
 
 workflow:
@@ -32,8 +36,12 @@ default:
 stages:
   - test
   - build
-  - publish
   - deploy
+
+variables:
+  CDN_BASE: "https://cdn.honex.life"
+  CDN_NS: "spool-sync"
+  MODULE: "gitlab.honex.life/spoolsync/spool-sync-prusa-connect"
 
 .go: &go
   image: golang:1.26-bookworm
@@ -63,19 +71,122 @@ build:
   rules: *rules
   needs: [test]
   script:
-    - TAG="${CI_COMMIT_TAG:-}" sh scripts/release.sh
+    - |
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        TAG="$CI_COMMIT_TAG" sh scripts/release.sh
+      else
+        SUFFIX="dev.$CI_PIPELINE_IID" sh scripts/release.sh
+      fi
   artifacts:
     name: "spool-sync-prusa-connect-$CI_COMMIT_SHORT_SHA"
     expire_in: 30 days
     paths:
       - dist/*.tar.gz
       - dist/*.tar.gz.sha256
+      - dist/version
 
-publish:
-  stage: publish
+# Uploads $1 to the CDN as $2 and fails unless $CDN_BASE/file/$CDN_NS/$2$4
+# serves back the bytes whose sha256 is $3, the digest Connect holds the
+# download to. Cloudflare caches /file/ by URL, query string included, so $4
+# (such as ?build=42) gets past a cached copy of an earlier upload.
+.cdn: &cdn
+  - apk add --no-cache curl jq
+  - |
+    cdn_upload() {
+      if [ -z "${HONEX_CDN_TOKEN:-}" ]; then
+        echo "HONEX_CDN_TOKEN is not set (a protected variable needs a protected ref)" >&2
+        return 1
+      fi
+      echo "Uploading $1 as $2"
+      curl -fsS -X POST \
+        -H "Authorization: $HONEX_CDN_TOKEN" \
+        -F "file=@$1" \
+        --form-string "filename=$2" \
+        "$CDN_BASE/api/cdn/files/$CDN_NS" \
+        -o /dev/null
+      got=$(curl -fsSL "$CDN_BASE/file/$CDN_NS/$2${4:-}" | sha256sum | cut -d' ' -f1)
+      if [ "$got" != "$3" ]; then
+        echo "$CDN_BASE/file/$CDN_NS/$2${4:-} serves sha256 $got, the build made $3" >&2
+        return 1
+      fi
+    }
+
+# ---------------------------------------------------------------------------
+# deploy:connect — every main push is installed on connect.honex.life.
+# Installing over an installed release is the update: settings and the
+# SpoolSync token are kept, and a permission an operator took away stays away.
+# resource_group runs one deploy at a time, so the stable CDN name is never
+# overwritten between this job's upload and Connect's download; Connect
+# refuses a download whose sha256 differs anyway.
+# ---------------------------------------------------------------------------
+
+deploy:connect:
+  stage: deploy
   tags: [hetzner-small]
   image: alpine:3.22
-  # A release upload must never be cut off half-way by a newer push.
+  interruptible: false
+  resource_group: connect-honex
+  environment:
+    name: connect-honex
+    url: https://connect.honex.life
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "web"
+  needs:
+    - job: build
+      artifacts: true
+  variables:
+    CONNECT_URL: "https://connect.honex.life"
+  before_script: *cdn
+  script:
+    - |
+      set -eu
+      if [ -z "${CONNECT_ADMIN_TOKEN:-}" ]; then
+        echo "deploy: CONNECT_ADMIN_TOKEN is not set" >&2
+        exit 1
+      fi
+
+      VERSION=$(cat dist/version)
+      ARCHIVE="dist/spool-sync-prusa-connect-$VERSION.tar.gz"
+      SHA256=$(cat "$ARCHIVE.sha256")
+      NAME="spool-sync-prusa-connect-dev.tar.gz"
+      BUST="?build=$CI_PIPELINE_IID"
+
+      cdn_upload "$ARCHIVE" "$NAME" "$SHA256" "$BUST"
+
+      jq -n --arg module "$MODULE" --arg version "$VERSION" \
+            --arg from "$CDN_BASE/file/$CDN_NS/$NAME$BUST" --arg sha256 "$SHA256" \
+            '{module: $module, version: $version, from: $from, sha256: $sha256, approve: true}' > body.json
+      cat body.json
+
+      status=$(curl -sS -o answer.json -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer $CONNECT_ADMIN_TOKEN" \
+        -H "Content-Type: application/json" \
+        --data-binary @body.json \
+        "$CONNECT_URL/api/v1/modules")
+      jq . answer.json || cat answer.json
+
+      case "$status" in
+        2??) ;;
+        *) echo "deploy: Connect answered $status" >&2; exit 1 ;;
+      esac
+
+      state=$(jq -r '.state // empty' answer.json)
+      echo "Installed $VERSION on $CONNECT_URL, state ${state:-unknown}"
+      if [ "$state" = failed ]; then
+        echo "deploy: the module did not start: $(jq -r '.reason // empty' answer.json)" >&2
+        exit 1
+      fi
+
+# ---------------------------------------------------------------------------
+# publish — a v* tag goes on the CDN for published builds. Each release keeps
+# its own file name, so its URL and sha256 never drift apart.
+# ---------------------------------------------------------------------------
+
+publish:
+  stage: deploy
+  tags: [hetzner-small]
+  image: alpine:3.22
   interruptible: false
   rules:
     - if: $CI_COMMIT_TAG =~ /^v[0-9]/
@@ -83,42 +194,18 @@ publish:
     - job: build
       artifacts: true
   variables:
-    CDN_BASE: "https://cdn.honex.life"
-    CDN_NS: "spool-sync"
     KV_KEY: "spool-sync-prusa-connect"
-    MODULE: "gitlab.honex.life/spoolsync/spool-sync-prusa-connect"
-  before_script:
-    - apk add --no-cache curl jq
+  before_script: *cdn
   script:
     - |
       set -eu
-      if [ -z "${HONEX_CDN_TOKEN:-}" ]; then
-        echo "publish: HONEX_CDN_TOKEN is not set (is the tag protected?)" >&2
-        exit 1
-      fi
-
-      VERSION="${CI_COMMIT_TAG#v}"
+      VERSION=$(cat dist/version)
       ARCHIVE="dist/spool-sync-prusa-connect-$VERSION.tar.gz"
-      [ -f "$ARCHIVE" ] || { echo "publish: $ARCHIVE is missing" >&2; exit 1; }
       NAME=$(basename "$ARCHIVE")
       SHA256=$(cat "$ARCHIVE.sha256")
       URL="$CDN_BASE/file/$CDN_NS/$NAME"
 
-      echo "Uploading $NAME"
-      curl -fsS -X POST \
-        -H "Authorization: $HONEX_CDN_TOKEN" \
-        -F "file=@$ARCHIVE" \
-        --form-string "filename=$NAME" \
-        "$CDN_BASE/api/cdn/files/$CDN_NS" \
-        -o /dev/null
-
-      # The CDN must serve back the bytes the sha256 names, or an install
-      # from the KV entry would be refused with MODULE_DIGEST_MISMATCH.
-      GOT=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
-      if [ "$GOT" != "$SHA256" ]; then
-        echo "publish: $URL serves sha256 $GOT, the build made $SHA256" >&2
-        exit 1
-      fi
+      cdn_upload "$ARCHIVE" "$NAME" "$SHA256"
 
       latest=$(jq -n \
         --arg module  "$MODULE" \
@@ -140,70 +227,3 @@ publish:
 
       echo "Published $VERSION: $URL"
       echo "Latest: $CDN_BASE/value-store/$CDN_NS/$KV_KEY"
-
-# ---------------------------------------------------------------------------
-# deploy — installs the release just published on connect.honex.life, from
-# the CDN URL and its sha256. Installing over an installed release is the
-# update: settings and the SpoolSync token are kept, and a permission an
-# operator took away stays away. A release asking for more than the last one
-# is listed in `added`.
-#
-# Requires CONNECT_ADMIN_TOKEN (masked): a Connect token with the admin role
-# on the organization.
-# ---------------------------------------------------------------------------
-
-deploy:
-  stage: deploy
-  tags: [hetzner-small]
-  image: alpine:3.22
-  interruptible: false
-  resource_group: connect-honex
-  environment:
-    name: connect-honex
-    url: https://connect.honex.life
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v[0-9]/
-  needs:
-    - job: build
-      artifacts: true
-    - job: publish
-  variables:
-    CONNECT_URL: "https://connect.honex.life"
-    CDN_URL: "https://cdn.honex.life/file/spool-sync"
-    MODULE: "gitlab.honex.life/spoolsync/spool-sync-prusa-connect"
-  before_script:
-    - apk add --no-cache curl jq
-  script:
-    - |
-      set -eu
-      if [ -z "${CONNECT_ADMIN_TOKEN:-}" ]; then
-        echo "deploy: CONNECT_ADMIN_TOKEN is not set" >&2
-        exit 1
-      fi
-
-      VERSION="${CI_COMMIT_TAG#v}"
-      NAME="spool-sync-prusa-connect-$VERSION.tar.gz"
-      SHA256=$(cat "dist/$NAME.sha256")
-
-      jq -n --arg module "$MODULE" --arg version "$VERSION" \
-            --arg from "$CDN_URL/$NAME" --arg sha256 "$SHA256" \
-            '{module: $module, version: $version, from: $from, sha256: $sha256, approve: true}' > body.json
-
-      status=$(curl -sS -o answer.json -w '%{http_code}' -X POST \
-        -H "Authorization: Bearer $CONNECT_ADMIN_TOKEN" \
-        -H "Content-Type: application/json" \
-        --data-binary @body.json \
-        "$CONNECT_URL/api/v1/modules")
-      jq . answer.json || cat answer.json
-
-      case "$status" in
-        2??) ;;
-        *) echo "deploy: Connect answered $status" >&2; exit 1 ;;
-      esac
-
-      state=$(jq -r '.state // empty' answer.json)
-      echo "Installed $VERSION on $CONNECT_URL, state ${state:-unknown}"
-      if [ "$state" = failed ]; then
-        echo "deploy: the module did not start: $(jq -r '.reason // empty' answer.json)" >&2
-        exit 1
-      fi
