@@ -1,5 +1,7 @@
-# The manifest for spool-sync-prusa-connect, a module that is the Go process in main.go and
-# nothing else. There is no ui block, so it draws nothing in the app.
+# The manifest for spool-sync-prusa-connect: a Go process (main.go) that follows
+# every printer and keeps SpoolSync's spools in step, and a browser bundle
+# (ui/) with the Spools pages and a printer's Spools tab. It replaces the
+# Materials extension: SpoolSync is the only inventory.
 #
 # `prusa-connect module add` reads it out of the release and writes one
 # declaration from it.
@@ -22,7 +24,7 @@ license: MIT
 # installed module. Write your own sentence here, a title if the name alone reads badly, and your name or
 # your team's beside it.
 title: SpoolSync
-summary: Keeps the weight of NFC-tagged spools in SpoolSync in step with what Prusa printers report.
+summary: Your SpoolSync spools in Prusa Connect, with the weight on each printer tool kept in step.
 codeowner: SpoolSync
 # The module wire major the process half speaks.
 contract_major: 1
@@ -46,32 +48,57 @@ options:
   - key: spoolsync_token
     type: secret
     required: true
-    summary: A SpoolSync API token (ss_...) with the spools:view and spools:edit permissions.
-  - key: materials_module
-    type: string
-    default: "com.github.aux.prusa3d.materials"
-    summary: The namespace of the Materials module whose spools are followed.
-
-# Materials holds the spools; this module follows it and does nothing without it.
-suggest:
-  com.github.aux.prusa3d.materials: "The spools printers read off their NFC tags, and their weight"
-calls:
-  - com.github.aux.prusa3d.materials
+    summary: A SpoolSync API token (ss_...) with spools:view, spools:edit, spools:create and filament_types:view.
 
 require:
+  core-device.list: "*"
+  core-device.get: "*"
   core-bus.subscribe: "*"
-  core-routes.call: "*"
+  core-access.check: "*"
+
+# A database of its own: which SpoolSync spool a person put on a tool that
+# reads no tag, and the last odometer reading of each tool. A SQLite file in
+# the module's data directory unless the operator picks Postgres at install.
+needs:
+  database: true
 
 # The one connection outside Prusa Connect: the SpoolSync server the operator names.
 egress:
   - option: spoolsync_url
-    why: Sets the weight of each NFC-tagged spool in the operator's SpoolSync inventory.
-    sends: The OpenPrintTag instance UUID of each tagged spool and its weight in grams.
+    why: Reads and edits the operator's SpoolSync spools and filament types, and sets the weight of each spool on a printer tool.
+    sends: The spools a person adds or edits, the OpenPrintTag instance UUID of tagged spools, and each spool's weight in grams.
 
-# The sync loop runs as this module, with nobody behind it: it reads Materials'
-# spools and subscribes to its spool events.
+# Read every printer and its event stream, to follow the spool on each tool.
 permissions:
   - observe
+# Ask whether a person may operate a printer before changing which spool is on
+# one of its tools. The module never operates a printer itself, so it only asks.
+checks:
+  - operate
+
+ui:
+  # The built bundle's entry, relative to the bundle root.
+  entry: ui/index.js
+  # The range of @prusa/connect-ui this bundle was built against.
+  library: ">=0.1.0-beta.1 <1.0.0"
+  contributes:
+    # The whole of what this bundle may register. Each entry has one
+    # host.register call behind it in ui/src/index.ts.
+    pages:
+      - path: spools
+        title: Spools
+        icon: spool
+      - path: spool
+        title: Spool
+        hidden: true
+      - path: catalogue
+        title: Catalogue
+        icon: swatch-book
+    # A printer's Spools tab: the spool on each tool or MMU slot, with
+    # Assign, Change and Unassign for a tool that reads no tag.
+    device_tab:
+      - id: tools
+        title: Spools
 
 # The memory in MiB the server may budget for the process, children included.
 # needs:
