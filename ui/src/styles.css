@@ -16,6 +16,12 @@
    docs/src/content/docs/styling-a-module.md is the page behind this. */
 @reference 'tailwindcss';
 @reference '@prusa/connect-ui/tokens.css';
+/* The dialog height the library's newer theme defines and 0.1.0-beta.1 does
+   not. `inline` writes the value into the utility, so no variable has to be
+   on the host's :root. Drop it once the published theme carries it. */
+@theme inline {
+  --spacing-dialog-height: calc(100dvh - 2rem);
+}
 @layer utilities {
   @tailwind utilities;
 }
