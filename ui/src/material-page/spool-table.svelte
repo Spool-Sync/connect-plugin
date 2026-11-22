@@ -38,7 +38,7 @@
     TableRow,
   } from '@prusa/connect-ui/primitives';
 
-  import type { Detail, Printer, PrinterTools, Spool } from '../api';
+  import type { Printer, PrinterTools, Spool } from '../api';
   import { heldHost } from '../host';
   import { OWN_MODULE } from '../own-module';
   import ToolIcon from '../printer-material/tool-icon.svelte';
@@ -48,7 +48,6 @@
 
   let {
     spools,
-    packages,
     mayWrite,
     busy,
     printers,
@@ -64,8 +63,6 @@
     selection,
   }: {
     spools: readonly Spool[];
-    /** The material's packages, which name a spool's package_uuid. */
-    packages: Detail['packages'];
     mayWrite: boolean;
     busy: boolean;
     /** The printers the person may observe, which name a spool's tool. */
@@ -87,7 +84,7 @@
     oncopy: (spool: Spool) => void;
     ondelete: (spool: Spool) => void;
     /** The ticked spools, by id. */
-    selection: Selection<number>;
+    selection: Selection<string>;
   } = $props();
 
   const { fleet, t } = heldHost();
@@ -122,19 +119,12 @@
       : toolOffer(t, printer, tool);
   };
 
-  // The package by its name, and the empty weight the spool itself keeps,
-  // which is the package's unless the person typed another.
-  const container = (spool: Spool): string => {
-    const known = packages.find((p) => p.uuid === spool.package_uuid);
-    const parts = [
-      known === undefined ? '' : known.container_name || known.slug,
-      spool.empty_weight_g === undefined
-        ? ''
-        : t('materials.spool.packageEmpty', { g: spool.empty_weight_g }),
-    ].filter((part) => part !== '');
-
-    return parts.length === 0 ? '—' : parts.join(' · ');
-  };
+  // The empty weight the spool keeps. SpoolSync holds no package, so the
+  // container is the spool's own empty weight and nothing else.
+  const container = (spool: Spool): string =>
+    spool.empty_weight_g === undefined
+      ? '—'
+      : t('materials.spool.packageEmpty', { g: spool.empty_weight_g });
 
   // Below `@md` a row is a card (see the materials list): each cell keeps its
   // own column name, which the header row no longer carries.

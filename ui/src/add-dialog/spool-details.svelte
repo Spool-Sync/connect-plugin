@@ -1,22 +1,16 @@
 <!--
-  Step 2's fields: how many spools, the package, the weights, what is left,
-  where they are kept, and a summary of what the submit will make.
+  Step 2's fields: how many spools, the weights, what is left, where they are
+  kept, and a summary of what the submit will make.
 
   Every field writes straight onto the draft, which is what the dialog posts.
-  A package fills the weights and the length; the person may still change
-  them.
+  SpoolSync holds no packages, so there is nothing to choose a weight from:
+  the person types the weights.
 -->
 <script lang="ts">
-  import { formatNumber } from '@prusa/connect-ui/i18n';
   import {
     Field,
     Input,
     Label,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
     Textarea,
   } from '@prusa/connect-ui/primitives';
 
@@ -34,42 +28,6 @@
   const t = heldHost().t;
   const uid = $props.id();
 
-  const NONE = '*';
-  const packages = $derived(draft.material?.packages ?? []);
-  const packageItems = $derived([
-    { value: NONE, label: t('materials.spool.noPackage') },
-    ...packages.map((p) => ({
-      value: p.uuid,
-      label: packageLabel(p),
-    })),
-  ]);
-
-  // A package's label: its name, then the filament weight, the empty
-  // spool and the diameter, each only when the catalogue knows it.
-  const packageLabel = (p: (typeof packages)[number]): string => {
-    const spec = [
-      p.net_weight_g === undefined
-        ? undefined
-        : t('materials.spool.packageNet', { g: Math.round(p.net_weight_g) }),
-      p.empty_weight_g === undefined
-        ? undefined
-        : t('materials.spool.packageEmpty', {
-            g: Math.round(p.empty_weight_g),
-          }),
-      p.diameter_um === undefined
-        ? undefined
-        : t('materials.spool.packageDiameter', {
-            mm: formatNumber(p.diameter_um / 1000, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }),
-          }),
-    ].filter((part) => part !== undefined);
-
-    return [p.container_name || p.slug, spec.join(' · ')]
-      .filter((part) => part !== '')
-      .join(' — ');
-  };
 
   const typed = (event: Event): string =>
     (event.currentTarget as HTMLInputElement).value;
@@ -107,31 +65,6 @@
     data-part="spool-details"
     class={['fields grid gap-4', { compact: section === 'optional' }]}
   >
-    {#if packages.length > 0}
-      <!-- A row of its own and first: a package names its weights in full, which
-         a narrow cell cut through, and choosing it fills the fields below. -->
-      <div class="col-span-full flex min-w-0 flex-col gap-2">
-        <Label for="{uid}-package">{t('materials.spool.package')}</Label>
-        <Select
-          value={draft.packageUuid ?? NONE}
-          onValueChange={(chosen: string) => {
-            draft.choosePackage(chosen === NONE ? undefined : chosen);
-          }}
-          items={packageItems}
-        >
-          <SelectTrigger id="{uid}-package" class="w-full min-w-0">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {#each packageItems as item (item.value)}
-              <SelectItem value={item.value} label={item.label}>
-                {item.label}
-              </SelectItem>
-            {/each}
-          </SelectContent>
-        </Select>
-      </div>
-    {/if}
 
     {#if section === 'all'}
       <Field
@@ -167,19 +100,6 @@
         name: 'empty_weight_g',
         ...weightProps(draft.emptyWeightG),
         oninput: (e: Event) => (draft.emptyWeightG = weight(e)),
-      }}
-    />
-    <Field
-      label={t('materials.spool.length')}
-      control={Input}
-      controlProps={{
-        name: 'length_mm',
-        type: 'number',
-        inputmode: 'numeric',
-        min: 0,
-        step: 1,
-        value: draft.lengthMM ?? '',
-        oninput: (e: Event) => (draft.lengthMM = grams(e)),
       }}
     />
 

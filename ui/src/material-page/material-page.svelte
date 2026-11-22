@@ -101,9 +101,7 @@
   // A material only spools still know (a re-import dropped it, or it is a
   // colleague's custom one) takes no new spool: the module refuses it. It may
   // still be starred, being a row of the list.
-  const known = $derived(
-    detail?.material !== undefined || detail?.custom !== undefined,
-  );
+  const known = $derived(detail !== undefined);
 
   let nameVersion = 0;
 
@@ -343,7 +341,7 @@
     if (saved) editing = undefined;
   };
 
-  const mergeSpool = async (into: number): Promise<void> => {
+  const mergeSpool = async (into: string): Promise<void> => {
     const from = merging;
     if (from === undefined) return;
     const merged = await attempt(async () => {
@@ -374,7 +372,7 @@
     }
   };
 
-  // A copy is a new spool with the same package, weights, place and notes,
+  // A copy is a new spool with the same weights, place and notes,
   // added at once; one copied by mistake goes with Delete.
   const copySpool = async (spool: Spool): Promise<void> => {
     fault = undefined;
@@ -382,10 +380,8 @@
       // A field the spool lacks is left out of the draft, not set undefined.
       const kept = {
         material_uuid: spool.material_uuid,
-        package_uuid: spool.package_uuid,
         full_weight_g: spool.full_weight_g,
         empty_weight_g: spool.empty_weight_g,
-        length_mm: spool.length_mm,
         remaining_weight_g: spool.remaining_weight_g,
         notes: spool.notes,
         location_id: spool.location_id,
@@ -432,12 +428,12 @@
   };
 
   /** The ticked spools, which Delete selected deletes together. */
-  const selection = new Selection<number>({
+  const selection = new Selection<string>({
     rows: () => spools.map((s) => s.id),
   });
 
   // Deleted spools leave the list, which drops their ticks, and their places on the later pages.
-  const removed = (ids: readonly number[]): void => {
+  const removed = (ids: readonly string[]): void => {
     spools = spools.filter((s) => !ids.includes(s.id));
     if (next !== undefined) next -= ids.length;
   };
@@ -523,13 +519,13 @@
   {:else}
     <PageHeader title={detail?.name ?? t('materials.material.page.title')}>
       {#snippet actions()}
-        {#if detail !== undefined && (known || detail.spools > 0)}
+        {#if detail !== undefined && (known || (detail.spools ?? 0) > 0)}
           <Toggle
             size="md"
             bind:pressed={
               () => detail?.is_favourite ?? false, () => void star()
             }
-            aria-label={t('materials.row.star', { name: detail.name })}
+            aria-label={t('materials.row.star', { name: detail.name ?? '' })}
             disabled={!list.mayWrite || list.busy}
           >
             <span
@@ -618,7 +614,6 @@
           {:else}
             <SpoolTable
               {spools}
-              packages={detail.packages}
               mayWrite={list.mayWrite}
               {busy}
               {printers}
@@ -686,7 +681,7 @@
   {next}
   {busy}
   fault={dialogFault}
-  onmerge={(into: number) => void mergeSpool(into)}
+  onmerge={(into: string) => void mergeSpool(into)}
   onclose={() => (merging = undefined)}
 />
 
@@ -709,7 +704,7 @@
     </DialogHeader>
     {#if editingMaterial && detail?.custom}
       <CustomMaterialForm
-        initial={detail.custom}
+        initial={detail.custom && { ...detail.custom, class: detail.custom.class === 'SLA' ? 'SLA' : 'FFF' }}
         submitLabel={t('materials.material.save')}
         {busy}
         fault={dialogFault}

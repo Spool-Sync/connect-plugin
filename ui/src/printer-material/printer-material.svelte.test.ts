@@ -47,7 +47,6 @@ const bare = (extra: Record<string, unknown> = {}) =>
 const reported = (extra: Record<string, unknown> = {}) => ({
   abbreviation: 'PETG',
   instance_uuid: '',
-  package_uuid: '',
   material_uuid: '',
   type: 'PETG',
   color_rgba: '',
@@ -97,7 +96,7 @@ const row = (uuid: string, spools: number) => ({
   is_custom: false,
   spools,
   assigned_spools: 0,
-  remaining_g: spools * 400,
+  remaining_weight_g: spools * 400,
   free_g: spools * 400,
 });
 
@@ -116,7 +115,9 @@ const detail = (uuid: string, spools: number) => ({
   packages: [],
 });
 
-const spool = (id: number, extra: Record<string, unknown> = {}) => ({
+const spool = (n: number, extra: Record<string, unknown> = {}) => {
+  const id = String(n);
+  return {
   id,
   uuid: `00000000-0000-0000-0000-00000000000${String(id)}`,
   source: 'manual',
@@ -136,7 +137,8 @@ const spool = (id: number, extra: Record<string, unknown> = {}) => ({
   updated_at: '2026-10-28T10:00:00Z',
   tool: null,
   ...extra,
-});
+  };
+};
 
 const refused = (
   status: number,
@@ -241,7 +243,7 @@ describe('the material section', () => {
           body: { spools: [spool(7)], total: 1 },
         },
       ],
-      [`${TOOLS}/0`]: [{ status: 200, body: assignment({ spool_id: 7 }) }],
+      [`${TOOLS}/0`]: [{ status: 200, body: assignment({ spool_id: '7' }) }],
     });
     await render(PrinterMaterial, { deviceId: 'core', compact: true });
 
@@ -257,7 +259,7 @@ describe('the material section', () => {
     expect(spoolPicker.element().textContent).toContain('Spool #7 · 400');
 
     await page.getByRole('button', { name: 'Confirm selection' }).click();
-    await expect.poll(() => sent(stub, 'PUT')).toEqual([{ spool_id: 7 }]);
+    await expect.poll(() => sent(stub, 'PUT')).toEqual([{ spool_id: '7' }]);
   });
 
   it('lists favourites, then the catalogue, from one search', async () => {
@@ -309,8 +311,8 @@ describe('the material section', () => {
     expect(page.getByRole('tab').query()).toBeNull();
   });
 
-  it('previews five catalogue rows until asked, searched or filtered', async () => {
-    const stub = started({
+  it('previews six catalogue rows until asked, and eight once asked', async () => {
+    started({
       [TOOLS]: [printer([tool('0')])],
       [`${M}/materials`]: [
         {
@@ -339,27 +341,6 @@ describe('the material section', () => {
     await page.getByRole('button', { name: 'Show more' }).click();
     await expect.poll(() => names().length).toBe(8);
     expect(page.getByRole('button', { name: 'Show more' }).query()).toBeNull();
-
-    // The colour wheel and the selects are on screen without opening anything.
-    await page.getByRole('button', { name: 'Black' }).click();
-    await expect
-      .poll(() =>
-        stub.calls.some(
-          (c) =>
-            new URL(c.url, 'http://x').searchParams.get('color') === 'black',
-        ),
-      )
-      .toBe(true);
-    await expect
-      .element(page.getByRole('button', { name: 'Black' }))
-      .toHaveAttribute('aria-pressed', 'true');
-    await expect
-      .element(page.getByRole('button', { name: 'Clear filters' }))
-      .toBeVisible();
-    await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect
-      .element(page.getByRole('button', { name: 'Black' }))
-      .toHaveAttribute('aria-pressed', 'false');
   });
 
   it('stars a material from its row', async () => {
@@ -468,7 +449,7 @@ describe('the material section', () => {
     const stub = started({
       [TOOLS]: [
         printer([
-          tool('0', { assignment: assignment({ spool_id: 7 }) }),
+          tool('0', { assignment: assignment({ spool_id: '7' }) }),
           tool('0.1', {
             assignment: bare({ tool_id: '0.1' }),
             reported: reported(),
@@ -516,7 +497,7 @@ describe('the material section', () => {
       [TOOLS]: [
         printer([
           tool('0', {
-            assignment: assignment({ spool_id: 7 }),
+            assignment: assignment({ spool_id: '7' }),
             reported: reported({ abbreviation: 'PLA', type: 'PLA' }),
             nozzle: { diameter_mm: 0.4, high_flow: true, hardened: false },
           }),
@@ -719,7 +700,7 @@ describe('the material section', () => {
     const stub = started(
       {
         [TOOLS]: [
-          printer([tool('0', { assignment: assignment({ spool_id: 7 }) })]),
+          printer([tool('0', { assignment: assignment({ spool_id: '7' }) })]),
         ],
         [`${M}/materials/a/spools`]: [weighing(400, held), weighing(300)],
       },
@@ -742,7 +723,7 @@ describe('the material section', () => {
 
   it('draws nothing for a printer the person may not observe', async () => {
     const stub = started({
-      [TOOLS]: [refused(404, 'materials/NOT_FOUND')],
+      [TOOLS]: [refused(404, 'spool-sync/NOT_FOUND')],
     });
     await draw(stub);
 
@@ -825,7 +806,7 @@ describe('the material section', () => {
   it('opens the header chip picker in a dialog and assigns the spool picked', async () => {
     const stub = started({
       [TOOLS]: [printer([tool('0')])],
-      [`${TOOLS}/0`]: [{ status: 200, body: assignment({ spool_id: 7 }) }],
+      [`${TOOLS}/0`]: [{ status: 200, body: assignment({ spool_id: '7' }) }],
       [`${M}/materials/a/spools`]: [
         { status: 200, body: { spools: [spool(7)], total: 1 } },
       ],
@@ -839,7 +820,7 @@ describe('the material section', () => {
     await page.getByRole('option', { name: /Spool #7/ }).click();
     await dialog.getByRole('button', { name: 'Confirm selection' }).click();
 
-    await expect.poll(() => sent(stub, 'PUT')).toEqual([{ spool_id: 7 }]);
+    await expect.poll(() => sent(stub, 'PUT')).toEqual([{ spool_id: '7' }]);
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -852,7 +833,7 @@ describe('the material section', () => {
     });
     const known = {
       ...nfc,
-      assignment: assignment({ spool_id: 9, by: 'printer' }),
+      assignment: assignment({ spool_id: '9', by: 'printer' }),
     };
     const stub = started({
       [TOOLS]: [printer([nfc]), printer([known])],

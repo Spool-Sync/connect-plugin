@@ -22,7 +22,7 @@ const row = (uuid: string, extra: Record<string, unknown> = {}) => ({
   is_custom: false,
   spools: 2,
   assigned_spools: 0,
-  remaining_g: 500,
+  remaining_weight_g: 500,
   free_g: 500,
   ...extra,
 });
@@ -67,7 +67,7 @@ const started = (
       [`/api/v1/modules/${NS}/locations`]: [
         {
           status: 200,
-          body: { locations: [{ id: 7, name: 'Shelf A', spools: 2 }] },
+          body: { locations: [{ id: '7', name: 'Shelf A', spools: 2 }] },
         },
       ],
       [`/api/v1/modules/${NS}/favourites/a`]: [{ status: 204, body: null }],
@@ -307,12 +307,7 @@ describe('the materials page', () => {
               type: 'PLA',
               abbreviation: '',
               color_rgba: '#2762ED',
-              ral_code: '',
-              secondary_colors: [],
-              certifications: [],
-              tags: [],
-              created_at: '2026-10-29T10:00:00Z',
-              updated_at: '2026-10-29T10:00:00Z',
+              density: 1.24,
             },
           },
         ],
@@ -352,27 +347,6 @@ describe('the materials page', () => {
     await expect
       .element(link)
       .toHaveAttribute('href', stub.host.pageHref('material') + '?uuid=a');
-  });
-
-  it('measures each row against its own spools, and draws no bar without a full weight', async () => {
-    const stub = started(
-      listing([
-        row('a', { spools: 2, remaining_g: 800, capacity_g: 2000 }),
-        row('b', { spools: 1, remaining_g: 300 }),
-      ]),
-    );
-    await draw(stub);
-
-    const bar = page.getByRole('progressbar', {
-      name: 'What is left of PLA a',
-    });
-    await expect.element(bar).toHaveAttribute('aria-valuenow', '800');
-    await expect.element(bar).toHaveAttribute('aria-valuemax', '2000');
-    await expect.element(page.getByText('0.8 / 2 kg')).toBeVisible();
-    await expect.element(page.getByText('0.3 kg')).toBeVisible();
-    await expect
-      .element(page.getByRole('progressbar', { name: 'What is left of PLA b' }))
-      .not.toBeInTheDocument();
   });
 
   it('toggles a star', async () => {
@@ -434,17 +408,6 @@ describe('the materials page', () => {
       .poll(() => lastList(stub).searchParams.get('type'))
       .toBe('PETG');
     expect(lastList(stub).searchParams.get('brand')).toBe('prusament');
-
-    await pick('Location', 'shel', 'Shelf A');
-    await expect
-      .poll(() => lastList(stub).searchParams.get('location'))
-      .toBe('7');
-
-    await page.getByRole('button', { name: 'Colour' }).click();
-    await page.getByRole('button', { name: 'Blue', exact: true }).click();
-    await expect
-      .poll(() => lastList(stub).searchParams.get('color'))
-      .toBe('blue');
 
     await page.getByRole('button', { name: 'My custom' }).click();
     await expect

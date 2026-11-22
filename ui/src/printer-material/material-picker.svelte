@@ -36,22 +36,21 @@
   import { moduleTabId } from '@prusa/connect-ui/slots';
   import { onMount, tick, untrack } from 'svelte';
 
-  import FilamentColorWheel from '../colour-wheel.svelte';
   import MaterialIcon from '../material-icon/material-icon.svelte';
 
   import { SpoolDraftForm } from '../add-dialog/draft.svelte';
   import SpoolDetails from '../add-dialog/spool-details.svelte';
   import CustomMaterialForm from '../add-dialog/custom-material-form.svelte';
-  import type {
-    Detail,
-    MaterialFields,
-    MaterialsService,
-    Row,
-    Spool,
-    Tool,
+  import {
+    type Detail,
+    type MaterialFields,
+    type MaterialsService,
+    type Row,
+    type Spool,
+    type Tool,
+    rowOf,
   } from '../api';
   import { heldCatalogue } from '../catalogue.svelte';
-  import { WHEEL, WHEEL_OUTER } from '../colour-palette';
   import { heldHost } from '../host';
   import { heldList, MaterialList } from '../list.svelte';
   import MaterialDetails from '../material-page/material-details.svelte';
@@ -107,7 +106,6 @@
   let query = $state('');
   let type = $state<string>();
   let brand = $state<string>();
-  let colour = $state<string>();
   let expanded = $state(false);
   /** The tool goes back to what the printer reports. Chosen when it holds nothing. */
   let reading = $state(!hasMaterial);
@@ -131,10 +129,9 @@
     q: query.trim() || undefined,
     type,
     brand,
-    color: colour,
   });
   const filterCount = $derived(
-    [type, brand, colour].filter((value) => value !== undefined).length,
+    [type, brand].filter((value) => value !== undefined).length,
   );
   const favourites = $derived(list.rows.filter((row) => row.is_favourite));
   const others = $derived(list.rows.filter((row) => !row.is_favourite));
@@ -198,7 +195,7 @@
     const { signal } = spoolRead;
     void service.material(current, signal).then(
       (detail) => {
-        if (!signal.aborted) void select(detail);
+        if (!signal.aborted) void select(rowOf(detail));
       },
       () => undefined,
     );
@@ -250,7 +247,7 @@
       do {
         const page = await service.spools(row.uuid, offset, signal);
         found.push(...page.spools.filter((spool) => spool.archived_at == null));
-        offset = page.next;
+        offset = page.next ?? undefined;
       } while (offset !== undefined && !signal.aborted);
       if (signal.aborted) return;
       spools = found;
@@ -372,7 +369,7 @@
         is_favourite: false,
         spools: 0,
         assigned_spools: 0,
-        remaining_g: 0,
+        remaining_weight_g: 0,
         free_g: 0,
       });
       void closeForm('create');
@@ -404,7 +401,7 @@
           tool.id,
           spoolId === '' || spoolId === 'material'
             ? { material_uuid: picked.uuid }
-            : { spool_id: Number(spoolId) },
+            : { spool_id: spoolId },
         );
       }
       onassigned();
@@ -431,7 +428,6 @@
   const clearFilters = (): void => {
     type = undefined;
     brand = undefined;
-    colour = undefined;
   };
 </script>
 
@@ -495,11 +491,13 @@
       class="h-8 min-w-0 justify-start gap-2 px-2 py-0 text-start font-normal whitespace-nowrap aria-pressed:bg-secondary aria-pressed:ring-1 aria-pressed:ring-ring"
       onclick={choose}
     >
-      <MaterialIcon
-        materialClass="FFF"
-        colorRgba={color === '' ? undefined : color}
-        class="size-4"
-      />
+      <span aria-hidden="true" class="inline-flex shrink-0">
+        <MaterialIcon
+          materialClass="FFF"
+          colorRgba={color === '' ? undefined : color}
+          class="size-4"
+        />
+      </span>
       <span class="min-w-0 truncate font-medium">{name}</span>
       {#if note}
         <span class="min-w-0 shrink-2 truncate text-xs text-muted-foreground">
@@ -639,14 +637,6 @@
             class="picker-filters grid items-center gap-3"
             data-part="picker-filters"
           >
-            <FilamentColorWheel
-              colors={WHEEL}
-              outerCount={WHEEL_OUTER}
-              selected={WHEEL.find(([family]) => family === colour)}
-              labelOf={(family: (typeof WHEEL)[number]) => t(family[2])}
-              onChoose={([family]: (typeof WHEEL)[number]) =>
-                (colour = colour === family ? undefined : family)}
-            />
             <div
               class="grid min-w-0 gap-2 **:data-[slot=facet-popover-trigger]:w-full **:data-[slot=facet-popover-trigger]:max-w-none **:data-[slot=facet-popover-trigger]:min-w-0"
             >
@@ -702,7 +692,7 @@
             {@render choice(
               reading,
               reported?.color_rgba,
-              t('printerDetailInfo.filament.useReported'),
+              t('materials.printer.useReported'),
               reported?.abbreviation ?? t('materials.picker.nothingReported'),
               () => void select(undefined),
             )}
@@ -852,7 +842,7 @@
               disabled={!ready || assigning}
               onclick={() => void confirm()}
             >
-              {t('printerDetailInfo.filament.confirm')}
+              {t('materials.printer.confirm')}
             </Button>
           </div>
         </div>

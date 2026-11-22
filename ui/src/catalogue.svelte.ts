@@ -92,7 +92,7 @@ export class Catalogue {
       try {
         status = await this.#service.download();
       } catch (thrown) {
-        if (describeFault(thrown).code !== 'materials/IMPORT_RUNNING') {
+        if (describeFault(thrown).code !== 'spool-sync/IMPORT_RUNNING') {
           throw thrown;
         }
         status = await this.#service.catalogue();

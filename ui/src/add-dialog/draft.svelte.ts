@@ -13,10 +13,8 @@ export class SpoolDraftForm {
   step = $state<1 | 2>(1);
   material = $state.raw<Detail | undefined>(undefined);
   quantity = $state(1);
-  packageUuid = $state<string | undefined>(undefined);
   fullWeightG = $state<number | undefined>(undefined);
   emptyWeightG = $state<number | undefined>(undefined);
-  lengthMM = $state<number | undefined>(undefined);
   /** What is left on each spool. Left empty, the spools are full and read `netG`. */
   remainingG = $state<number | undefined>(undefined);
   /** The location the spools are kept at, none when undefined. */
@@ -25,35 +23,15 @@ export class SpoolDraftForm {
 
   /**
    * Takes the material and moves on to step 2. Another material drops the
-   * package and the weights it filled, which belonged to the old one.
+   * weights it filled, which belonged to the old one.
    */
   choose(detail: Detail): void {
     if (this.material?.uuid !== detail.uuid) {
-      this.packageUuid = undefined;
       this.fullWeightG = undefined;
       this.emptyWeightG = undefined;
-      this.lengthMM = undefined;
     }
     this.material = detail;
     this.step = 2;
-  }
-
-  /**
-   * Takes a catalogue package and fills the weights and the length from it.
-   * The full weight is the filament and the empty spool together. A field the
-   * package does not know is left for the person to type. No package keeps
-   * what was typed.
-   */
-  choosePackage(uuid?: string): void {
-    this.packageUuid = uuid;
-    const chosen = this.material?.packages.find((p) => p.uuid === uuid);
-    if (chosen === undefined) return;
-
-    const { net_weight_g: net, empty_weight_g: empty, length_mm } = chosen;
-    if (empty !== undefined) this.emptyWeightG = empty;
-    if (net !== undefined && empty !== undefined)
-      this.fullWeightG = net + empty;
-    if (length_mm !== undefined) this.lengthMM = length_mm;
   }
 
   /** The filament on a full spool, when both weights are known. */

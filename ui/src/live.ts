@@ -18,12 +18,12 @@ export interface ToolChange {
   device_id: string;
   tool_id: string;
   material_uuid?: string;
-  spool_id?: number;
+  spool_id?: string;
 }
 
 /** What a spool event carries. */
 export interface SpoolChange {
-  spool_id: number;
+  spool_id: string;
   spool_uuid: string;
   material_uuid: string;
   remaining_weight_g: number;

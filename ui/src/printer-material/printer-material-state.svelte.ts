@@ -11,12 +11,12 @@ function printerMaterials(
   let printer = $state.raw<PrinterTools | undefined>(undefined);
   let gone = $state(false);
   let fault = $state.raw<unknown>(undefined);
-  let spools = $state.raw<ReadonlyMap<number, Spool>>(new Map());
+  let spools = $state.raw<ReadonlyMap<string, Spool>>(new Map());
 
   /** The spools on the tools, read from their materials' spool lists. */
   const readSpools = async (
     tools: readonly Tool[],
-  ): Promise<Map<number, Spool>> => {
+  ): Promise<Map<string, Spool>> => {
     const on = tools.flatMap(({ assignment: a }) =>
       a?.spool_id === undefined
         ? []
@@ -60,7 +60,7 @@ function printerMaterials(
       if (mine === reads) spools = weighed ?? new Map();
     } catch (thrown) {
       if (mine !== reads) return;
-      if ((thrown as { code?: unknown }).code === 'materials/NOT_FOUND') {
+      if ((thrown as { code?: unknown }).code === 'spool-sync/NOT_FOUND') {
         gone = true;
         following.abort();
       } else {

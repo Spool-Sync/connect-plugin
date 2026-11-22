@@ -9,7 +9,6 @@
   import type { Snippet } from 'svelte';
 
   import {
-    Button,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -53,10 +52,15 @@
   const close = () => (open = false);
 </script>
 
-<div
-  class="flex flex-col gap-2 rounded-card border p-3"
+<button
+  type="button"
+  class="flex w-full flex-col items-start gap-2 rounded-card border p-3 text-start outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60"
   data-part="filament-position"
   data-tool={toolId}
+  disabled={disabledReason !== undefined}
+  title={disabledReason}
+  aria-busy={busy}
+  onclick={() => (open = true)}
 >
   <span class="text-xs text-muted-foreground">{position}</span>
   <span class="flex items-center gap-2 font-medium">
@@ -76,23 +80,14 @@
     <span class="text-sm tabular-nums">{t('materials.tools.left', { g: Math.round(remainingGrams) })}</span>
   {/if}
   {#if reported === undefined && disabledReason}
-    <p class="text-sm text-muted-foreground">{disabledReason}</p>
+    <span class="text-sm text-muted-foreground">{disabledReason}</span>
   {/if}
-  <div>
-    <Button
-      variant="secondary"
-      size="sm"
-      disabled={disabledReason !== undefined}
-      title={disabledReason}
-      pending={busy}
-      onclick={() => (open = true)}
-    >
-      {remainingGrams === undefined && reported === undefined
-        ? t('materials.printer.assign')
-        : t('materials.printer.change')}
-    </Button>
-  </div>
-</div>
+  <span class="text-sm font-medium text-primary">
+    {remainingGrams === undefined && reported === undefined
+      ? t('materials.printer.assign')
+      : t('materials.printer.change')}
+  </span>
+</button>
 
 <Dialog bind:open>
   <DialogContent data-module={OWN_MODULE} size="lg">

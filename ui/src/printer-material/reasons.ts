@@ -57,7 +57,7 @@ export const refusalText = (
     code?: unknown;
     params?: { reason?: unknown; state?: unknown };
   };
-  if (code !== 'materials/TOOL_REFUSED') return undefined;
+  if (code !== 'spool-sync/TOOL_REFUSED') return undefined;
   const text = (value: unknown): string =>
     typeof value === 'string' ? value : '';
 

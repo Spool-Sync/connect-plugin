@@ -8,8 +8,8 @@ import { type Answer, type Stub, stubHost } from '../test/host';
 const NS = 'life.honex.gitlab.aux.spoolsync.spool-sync-prusa-connect';
 const LOCATIONS = `/api/v1/modules/${NS}/locations`;
 
-const shelf = { id: 1, name: 'Shelf', spools: 3 };
-const box = { id: 2, name: 'Box', spools: 0 };
+const shelf = { id: '1', name: 'Shelf', spools: 3 };
+const box = { id: '2', name: 'Box', spools: 0 };
 
 const draw = async (
   routed: Record<string, readonly Answer[]>,

@@ -18,7 +18,7 @@ const row = (uuid: string, is_favourite = false) => ({
   is_custom: false,
   spools: 0,
   assigned_spools: 0,
-  remaining_g: 0,
+  remaining_weight_g: 0,
   free_g: 0,
 });
 
@@ -59,7 +59,7 @@ const held = () => {
     unassign: () => Promise.reject(new Error('unused')),
     addReported: () => Promise.reject(new Error('unused')),
     printers: () => Promise.resolve([]),
-    printerPage: () => Promise.resolve({ printers: [] }),
+    printerPage: () => Promise.resolve({ printers: [], total: 0 }),
     merge: () => Promise.reject(new Error('unused')),
     list: (query) =>
       new Promise<Page>((resolve) => {
@@ -245,7 +245,7 @@ describe('the material list', () => {
       {
         status: 403,
         contentType: 'application/problem+json',
-        body: { code: 'materials/NO_PRINCIPAL', title: 'no', detail: 'no' },
+        body: { code: 'spool-sync/NO_PRINCIPAL', title: 'no', detail: 'no' },
       },
     ]);
     const list = listOn(stub);

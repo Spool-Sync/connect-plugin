@@ -170,13 +170,13 @@
           <MaterialSwatch
             class="size-6"
             material={{
-              name: chosen.name,
+              name: chosen.name ?? '',
               colorRgba:
                 chosen.color_rgba === '' ? undefined : chosen.color_rgba,
             }}
           />
           <div class="min-w-0 flex-1">
-            <p class="font-medium">{chosen.name}</p>
+            <p class="font-medium">{chosen.name ?? ''}</p>
             <p class="text-sm text-muted-foreground">
               {[chosen.brand_name, chosen.type]
                 .filter((s) => s !== '')

@@ -23,7 +23,7 @@ const row = (uuid: string, extra: Record<string, unknown> = {}) => ({
   is_favourite: false,
   is_custom: false,
   spools: 0,
-  remaining_g: 0,
+  remaining_weight_g: 0,
   free_g: 0,
   ...extra,
 });
@@ -46,27 +46,8 @@ const detail = {
     type: 'PLA',
     abbreviation: '',
     color_rgba: '#ff0000ff',
-    min_print_temp: 205,
-    max_print_temp: 225,
-    min_bed_temp: 50,
-    max_bed_temp: 60,
-    density: 1.24,
-    tags: ['abrasive', 'contains_carbon_fiber'],
   },
-  packages: [
-    {
-      uuid: 'p1',
-      slug: 'pla-a-1kg',
-      class: 'FFF',
-      material_slug: 'pla-a',
-      container_slug: 'spool',
-      gtin: '',
-      container_name: 'Prusament spool',
-      net_weight_g: 1000,
-      empty_weight_g: 200,
-      length_mm: 330000,
-    },
-  ],
+  packages: [],
 };
 
 const custom = {
@@ -91,8 +72,8 @@ const shelves: Answer = {
   status: 200,
   body: {
     locations: [
-      { id: 1, name: 'Dry box', spools: 0 },
-      { id: 2, name: 'Shelf A', spools: 2 },
+      { id: '1', name: 'Dry box', spools: 0 },
+      { id: '2', name: 'Shelf A', spools: 2 },
     ],
   },
 };
@@ -120,7 +101,7 @@ const started = (
       // The list the picker reads, however often it reads it.
       [`${M}/locations`]: [shelves],
       // Two spools, as the module answers a quantity of 2.
-      [`${M}/spools`]: [{ status: 201, body: { added: 2, ids: [1, 2] } }],
+      [`${M}/spools`]: [{ status: 201, body: { added: 2, ids: ['1', '2'] } }],
       ...routed,
     },
   });
@@ -158,7 +139,6 @@ const lists = (stub: Stub): URL[] =>
 const pick = async () => {
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: /PLA a/u }).click();
-  await expect.element(dialog.getByText('205–225°C')).toBeVisible();
   await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect
     .element(dialog.getByRole('button', { name: 'Change material' }))
@@ -166,17 +146,19 @@ const pick = async () => {
 };
 
 /** The spools the dialog posted, as the module read them. */
-const sent = (stub: Stub): { location_id?: number } =>
+const sent = (stub: Stub): { location_id?: string } =>
   JSON.parse(
     stub.calls.find((c) => c.url.endsWith('/spools'))?.body ?? '{}',
-  ) as { location_id?: number };
+  ) as { location_id?: string };
 
-/** Picks the one package through the select, as a person does. */
+/**
+ * Types the full weight a 1 kg spool with a 200 g empty spool comes to, as a
+ * person does: SpoolSync holds no packages to choose the weights from.
+ */
 const choosePackage = async () => {
-  await page.getByRole('dialog').getByLabelText('Package').click();
-  await page
-    .getByRole('option', { name: 'Prusament spool — 1,000 g · empty 200 g' })
-    .click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabelText('Full weight (g)').fill('1200');
+  await dialog.getByLabelText('Empty spool weight (g)').fill('200');
 };
 
 describe('the add dialog', () => {
@@ -206,7 +188,6 @@ describe('the add dialog', () => {
     expect(post?.method).toBe('POST');
     expect(JSON.parse(post!.body!)).toMatchObject({
       material_uuid: 'a',
-      package_uuid: 'p1',
       quantity: 2,
       remaining_weight_g: 1000,
     });
@@ -234,7 +215,7 @@ describe('the add dialog', () => {
 
     await choosePackage();
     await dialog.getByRole('button', { name: 'Add spools' }).click();
-    await expect.poll(() => sent(stub).location_id).toBe(2);
+    await expect.poll(() => sent(stub).location_id).toBe('2');
   });
 
   it('creates a location from a name no location has, and picks it', async () => {
@@ -242,7 +223,7 @@ describe('the add dialog', () => {
     const stub = started({
       [`${M}/locations`]: [
         shelves,
-        { status: 200, body: { id: 3, name: 'Garage', spools: 0 } },
+        { status: 200, body: { id: '3', name: 'Garage', spools: 0 } },
       ],
     });
     const { dialog } = await open();
@@ -258,12 +239,12 @@ describe('the add dialog', () => {
 
     await choosePackage();
     await dialog.getByRole('button', { name: 'Add spools' }).click();
-    await expect.poll(() => sent(stub).location_id).toBe(3);
+    await expect.poll(() => sent(stub).location_id).toBe('3');
   });
 
   it('shows a full shelf and keeps the form', async () => {
     started({
-      [`${M}/spools`]: [refused(409, 'materials/SHELF_FULL')],
+      [`${M}/spools`]: [refused(409, 'spool-sync/SHELF_FULL')],
     });
     const { dialog, onclose } = await open();
     await choosePackage();
@@ -278,7 +259,7 @@ describe('the add dialog', () => {
 
   it('shows a busy database as try again in a moment', async () => {
     started({
-      [`${M}/spools`]: [refused(503, 'materials/BUSY')],
+      [`${M}/spools`]: [refused(503, 'spool-sync/BUSY')],
     });
     const { dialog } = await open();
     await choosePackage();
@@ -334,27 +315,8 @@ describe('the add dialog', () => {
       .toBeVisible();
 
     await dialog.getByRole('button', { name: /PLA a/u }).click();
-    await expect
-      .element(dialog.getByText('Contains carbon fiber'))
-      .toBeVisible();
-    await expect.element(dialog.getByText('Abrasive')).toBeVisible();
+    await expect.element(dialog.getByText('#ff0000ff')).toBeVisible();
     expect(dialog.getByText(/its details show up here/u).query()).toBe(null);
-  });
-
-  it('filters by a swatch and clears every filter', async () => {
-    const stub = started();
-    const { dialog } = await open({});
-    await expect.element(dialog.getByText('PLA a')).toBeVisible();
-
-    await dialog.getByRole('button', { name: 'Orange' }).click();
-    await expect
-      .poll(() => lists(stub).at(-1)!.searchParams.get('color'))
-      .toBe('orange');
-
-    await dialog.getByRole('button', { name: 'Clear filters' }).click();
-    await expect
-      .poll(() => lists(stub).at(-1)!.searchParams.has('color'))
-      .toBe(false);
   });
 
   it('shows the details of a picked material, then goes to step 2 and back', async () => {
@@ -408,11 +370,8 @@ describe('the add dialog', () => {
     // The manufacturer, the type and the primary colour are still missing.
     await expect.element(create).toBeDisabled();
 
-    // A preset writes the type and its temperatures, and the name follows.
+    // A preset writes the type and its density, and the name follows.
     await dialog.getByRole('button', { name: 'PETG', exact: true }).click();
-    await expect
-      .element(dialog.getByLabelText('Min nozzle temp'))
-      .toHaveValue(220);
     await expect
       .element(dialog.getByRole('combobox', { name: 'Material type' }))
       .toHaveValue('PETG');
@@ -422,7 +381,6 @@ describe('the add dialog', () => {
       .toHaveValue('PETG Shed');
     await dialog.getByLabelText('Material name *').fill('Shed PETG');
     await dialog.getByRole('button', { name: '#E02020' }).click();
-    await dialog.getByRole('button', { name: 'Abrasive' }).click();
     await create.click();
 
     await expect
@@ -436,33 +394,20 @@ describe('the add dialog', () => {
       type: 'PETG',
       class: 'FFF',
       color_rgba: '#E02020',
-      min_print_temp: 220,
-      max_chamber_temp: 50,
       density: 1.27,
-      tags: ['abrasive'],
-      secondary_colors: [],
     });
   });
 
-  it('asks a resin for no type, preset or temperature', async () => {
+  it('asks a resin for no type and no preset', async () => {
     started();
     const { dialog } = await open({});
     await dialog
       .getByRole('button', { name: 'Create custom material' })
       .click();
-    await expect
-      .element(dialog.getByRole('heading', { name: 'Temperature profile' }))
-      .toBeVisible();
 
     await dialog.getByRole('button', { name: 'SLA', exact: true }).click();
-    expect(
-      dialog.getByRole('heading', { name: 'Temperature profile' }).query(),
-    ).toBe(null);
     expect(dialog.getByRole('group', { name: 'Presets' }).query()).toBe(null);
     expect(dialog.getByText('Material type *').query()).toBe(null);
-    expect(dialog.getByLabelText('Min nozzle diameter (mm)').query()).toBe(
-      null,
-    );
 
     // Without a type to ask for, the manufacturer, a name and a colour do.
     await dialog.getByLabelText('Manufacturer *').fill('Resinco');
@@ -473,38 +418,4 @@ describe('the add dialog', () => {
       .toBeEnabled();
   });
 
-  it('drops the package and its weights when the material is changed', async () => {
-    started({
-      [`${M}/materials`]: [
-        {
-          status: 200,
-          body: listing([row('a'), row('b', { name: 'PETG b' })]),
-        },
-      ],
-      [`${M}/materials/b`]: [
-        {
-          status: 200,
-          body: { ...row('b', { name: 'PETG b' }), packages: [] },
-        },
-      ],
-    });
-    const { dialog } = await open({});
-    await pick();
-    await choosePackage();
-    await expect
-      .element(dialog.getByLabelText('Full weight (g)'))
-      .toHaveValue('1200');
-
-    await dialog.getByRole('button', { name: 'Change material' }).click();
-    await dialog.getByRole('button', { name: /PETG b/u }).click();
-    await expect
-      .element(dialog.getByRole('button', { name: 'Continue' }))
-      .toBeEnabled();
-    await dialog.getByRole('button', { name: 'Continue' }).click();
-
-    await expect
-      .element(dialog.getByLabelText('Full weight (g)'))
-      .toHaveValue('');
-    expect(dialog.getByLabelText('Package').query()).toBe(null);
-  });
 });

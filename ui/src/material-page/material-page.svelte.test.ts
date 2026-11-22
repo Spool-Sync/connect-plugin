@@ -1,5 +1,4 @@
 import type { Device, ReadonlyFleet } from '@prusa/connect-ui/domain';
-import { formatting } from '@prusa/connect-ui/i18n';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
@@ -21,7 +20,7 @@ const row = {
   is_custom: false,
   spools: 2,
   assigned_spools: 0,
-  remaining_g: 700,
+  remaining_weight_g: 700,
   free_g: 700,
 };
 
@@ -61,7 +60,9 @@ const own = {
   packages: [],
 };
 
-const spool = (id: number, extra: Record<string, unknown> = {}) => ({
+const spool = (n: number, extra: Record<string, unknown> = {}) => {
+  const id = String(n);
+  return {
   id,
   uuid: `00000000-0000-4000-8000-${String(id).padStart(12, '0')}`,
   source: 'manual',
@@ -81,7 +82,8 @@ const spool = (id: number, extra: Record<string, unknown> = {}) => ({
   created_at: '2026-10-28T10:00:00Z',
   updated_at: '2026-10-28T10:00:00Z',
   ...extra,
-});
+  };
+};
 
 const refused = (status: number, code: string): Answer => ({
   status,
@@ -204,7 +206,7 @@ describe('the material page', () => {
             device_id: 'masked-printer',
             tool_id: '0',
             material_uuid: 'a',
-            spool_id: 1,
+            spool_id: '1',
           },
         } as never;
       },
@@ -226,51 +228,6 @@ describe('the material page', () => {
     expect(stub.calls.some((call) => call.url.includes('masked-printer'))).toBe(
       false,
     );
-  });
-
-  it('names the package each spool came as, with its empty weight', async () => {
-    const pkg = {
-      uuid: 'p1',
-      slug: 'galaxy-black-1kg',
-      class: 'FFF',
-      material_slug: 'galaxy-black',
-      container_slug: 'spool',
-      gtin: '',
-      container_name: 'Prusament Spool 1kg',
-      net_weight_g: 1000,
-      empty_weight_g: 277,
-    };
-    const stub = started(
-      'a',
-      standard({
-        [`${M}/materials/a`]: [
-          { status: 200, body: { ...catalogue, packages: [pkg] } },
-        ],
-        [`${M}/materials/a/spools`]: [
-          {
-            status: 200,
-            body: {
-              spools: [
-                spool(1, { package_uuid: 'p1', empty_weight_g: 277 }),
-                spool(2, { empty_weight_g: 150 }),
-                spool(3),
-              ],
-              total: 3,
-            },
-          },
-        ],
-      }),
-    );
-    await draw(stub);
-
-    const cell = (id: number) =>
-      page.getByRole('row').filter({ hasText: `note ${String(id)}` });
-    await expect
-      .element(cell(1).getByText('Prusament Spool 1kg · empty 277 g'))
-      .toBeVisible();
-    await expect.element(cell(2).getByText('empty 150 g')).toBeVisible();
-    // The first dash is the package; the printer cell has its own.
-    await expect.element(cell(3).getByText('—').first()).toBeVisible();
   });
 
   it('measures the weight left against the filament, not the full spool', async () => {
@@ -338,7 +295,7 @@ describe('the material page', () => {
           {
             status: 200,
             body: {
-              spools: [spool(1, { location_id: 1 }), spool(2)],
+              spools: [spool(1, { location_id: '1' }), spool(2)],
               total: 2,
             },
           },
@@ -348,8 +305,8 @@ describe('the material page', () => {
             status: 200,
             body: {
               locations: [
-                { id: 1, name: 'Shelf 1', spools: 1 },
-                { id: 2, name: 'Shelf 2', spools: 0 },
+                { id: '1', name: 'Shelf 1', spools: 1 },
+                { id: '2', name: 'Shelf 2', spools: 0 },
               ],
             },
           },
@@ -357,7 +314,7 @@ describe('the material page', () => {
         [`${M}/spools/1`]: [
           {
             status: 200,
-            body: spool(1, { location_id: 2, location: 'Shelf 2' }),
+            body: spool(1, { location_id: '2', location: 'Shelf 2' }),
           },
         ],
       }),
@@ -376,7 +333,7 @@ describe('the material page', () => {
       .toBeDefined();
     const patch = stub.calls.find((c) => c.method === 'PATCH')!;
     expect(patch.url).toContain('/spools/1');
-    expect(JSON.parse(patch.body!)).toEqual({ location_id: 2 });
+    expect(JSON.parse(patch.body!)).toEqual({ location_id: '2' });
     await expect.element(page.getByText('Shelf 2')).toBeVisible();
   });
 
@@ -411,13 +368,13 @@ describe('the material page', () => {
         [`${M}/locations`]: [
           {
             status: 200,
-            body: { locations: [{ id: 2, name: 'Shelf 2', spools: 0 }] },
+            body: { locations: [{ id: '2', name: 'Shelf 2', spools: 0 }] },
           },
         ],
         [`${M}/spools/1`]: [
           {
             status: 200,
-            body: spool(1, { location_id: 2, location: 'Shelf 2' }),
+            body: spool(1, { location_id: '2', location: 'Shelf 2' }),
           },
         ],
       }),
@@ -436,13 +393,13 @@ describe('the material page', () => {
 
     await expect
       .poll(() => stub.calls.find((c) => c.method === 'PATCH')?.body)
-      .toBe(JSON.stringify({ location_id: 2 }));
+      .toBe(JSON.stringify({ location_id: '2' }));
   });
 
   it('shows the fault when a star is refused', async () => {
     const stub = started(
       'a',
-      standard({ [`${M}/favourites/a`]: [refused(503, 'materials/BUSY')] }),
+      standard({ [`${M}/favourites/a`]: [refused(503, 'spool-sync/BUSY')] }),
     );
     await draw(stub);
     await expect.element(page.getByText('note 1')).toBeVisible();
@@ -450,20 +407,8 @@ describe('the material page', () => {
     await page.getByRole('button', { name: /Star/u }).click();
 
     await expect
-      .element(page.getByRole('alert').getByText('materials/BUSY'))
+      .element(page.getByRole('alert').getByText('spool-sync/BUSY'))
       .toBeVisible();
-  });
-
-  it('writes the temperatures in the unit the reader chose', async () => {
-    formatting.temperature = 'fahrenheit';
-    try {
-      const stub = started('a', standard());
-      await draw(stub);
-
-      await expect.element(page.getByText('401–437°F')).toBeVisible();
-    } finally {
-      formatting.temperature = 'celsius';
-    }
   });
 
   it('asks before it deletes a spool, then removes the row', async () => {
@@ -558,7 +503,7 @@ describe('the material page', () => {
     await expect.element(page.getByText('note 3')).not.toBeInTheDocument();
     await expect.element(page.getByText('note 2')).toBeVisible();
     const sent = stub.calls.find((c) => c.url.endsWith('/spools/delete'))!;
-    expect(JSON.parse(sent.body!)).toEqual({ ids: [1, 3] });
+    expect(JSON.parse(sent.body!)).toEqual({ ids: ['1', '3'] });
     await expect
       .element(page.getByRole('button', { name: /^Delete \d+ spools?$/u }))
       .not.toBeInTheDocument();
@@ -625,7 +570,7 @@ describe('the material page', () => {
     const stub = started(
       'a',
       standard({
-        [`${M}/spools/delete`]: [refused(404, 'materials/NOT_FOUND')],
+        [`${M}/spools/delete`]: [refused(404, 'spool-sync/NOT_FOUND')],
       }),
     );
     await draw(stub);
@@ -649,7 +594,7 @@ describe('the material page', () => {
     const stub = started(
       'a',
       standard({
-        [`${M}/spools/delete`]: [refused(409, 'materials/SPOOL_ASSIGNED')],
+        [`${M}/spools/delete`]: [refused(409, 'spool-sync/SPOOL_ASSIGNED')],
       }),
     );
     await draw(stub);
@@ -666,39 +611,6 @@ describe('the material page', () => {
       .element(page.getByText('Unassign the spool from the printer first.'))
       .toBeVisible();
     await expect.element(page.getByText('note 1')).toBeVisible();
-  });
-
-  it('draws a material missing from the catalogue from its row', async () => {
-    const stub = started(
-      'a',
-      standard({
-        [`${M}/materials/a`]: [{ status: 200, body: { ...row, packages: [] } }],
-      }),
-    );
-    await draw(stub);
-
-    await expect
-      .element(page.getByRole('heading', { name: 'Galaxy Black' }))
-      .toBeVisible();
-    await expect.element(page.getByText('note 1')).toBeVisible();
-    await expect
-      .element(page.getByRole('button', { name: 'Edit material' }))
-      .not.toBeInTheDocument();
-    // The module refuses a new spool of it, but the spools keep it in the
-    // list, so it stars.
-    await expect
-      .element(page.getByRole('button', { name: 'Add spool' }))
-      .not.toBeInTheDocument();
-    await expect
-      .element(page.getByRole('button', { name: /Star|Unstar/u }))
-      .toBeInTheDocument();
-    await expect
-      .element(
-        page.getByText(
-          "This material is in neither the catalogue nor your own materials, so it can't be given new spools.",
-        ),
-      )
-      .toBeVisible();
   });
 
   it('shows more spools a page at a time', async () => {
@@ -729,7 +641,7 @@ describe('the material page', () => {
 
   it('shows the empty state, linking back, when the material is gone', async () => {
     const stub = started('zz', {
-      [`${M}/materials/zz`]: [refused(404, 'materials/NOT_FOUND')],
+      [`${M}/materials/zz`]: [refused(404, 'spool-sync/NOT_FOUND')],
       [`${M}/materials/zz/spools`]: [
         { status: 200, body: { spools: [], total: 0 } },
       ],
@@ -850,7 +762,7 @@ describe('the material page', () => {
       [`${M}/materials/c1/spools`]: [
         { status: 200, body: { spools: [spool(1)], total: 1 } },
       ],
-      [`${M}/custom-materials/c1`]: [refused(409, 'materials/MATERIAL_IN_USE')],
+      [`${M}/custom-materials/c1`]: [refused(409, 'spool-sync/MATERIAL_IN_USE')],
     });
     await draw(stub);
 
@@ -913,7 +825,7 @@ const toolsOf = (
 const holding = (extra: Record<string, unknown> = {}) => ({
   device_id: 'core',
   tool_id: '0',
-  spool_id: 1,
+  spool_id: '1',
   material_uuid: 'a',
   material_source: 'catalogue',
   material_name: 'Galaxy Black',
@@ -1494,7 +1406,7 @@ describe('a spool and the printers', () => {
       .poll(() => stub.calls.find((c) => c.url.endsWith('/spools/delete')))
       .toBeDefined();
     const sent = stub.calls.find((c) => c.url.endsWith('/spools/delete'))!;
-    expect(JSON.parse(sent.body!)).toEqual({ ids: [2] });
+    expect(JSON.parse(sent.body!)).toEqual({ ids: ['2'] });
   });
 
   it('edits the notes of a spool on a printer, and not its weight or archive', async () => {
@@ -1561,7 +1473,7 @@ describe('a spool and the printers', () => {
       .toBeDefined();
     const put = stub.calls.find((c) => c.method === 'PUT')!;
     expect(put.url).toContain('/printers/core/tools/0');
-    expect(JSON.parse(put.body!)).toEqual({ spool_id: 1 });
+    expect(JSON.parse(put.body!)).toEqual({ spool_id: '1' });
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
     await expect
       .element(
@@ -1622,7 +1534,7 @@ describe('a spool and the printers', () => {
       'a',
       standard({
         [`${M}/printers`]: [
-          refused(400, 'materials/INVALID'),
+          refused(400, 'spool-sync/INVALID'),
           printers(printerRow('core')),
         ],
       }),
@@ -1806,7 +1718,6 @@ describe('a spool and the printers', () => {
               reported: {
                 abbreviation: 'PETG',
                 instance_uuid: '',
-                package_uuid: '',
                 material_uuid: '',
                 type: 'PETG',
                 color_rgba: '',
@@ -1819,7 +1730,7 @@ describe('a spool and the printers', () => {
             status: 409,
             contentType: 'application/problem+json',
             body: {
-              code: 'materials/TOOL_REFUSED',
+              code: 'spool-sync/TOOL_REFUSED',
               status: 409,
               title: 'refused',
               detail: 'refused',
@@ -1895,7 +1806,7 @@ describe('a spool and the printers', () => {
       .poll(() => stub.calls.find((c) => c.url.endsWith('/spools/1/merge')))
       .toBeDefined();
     const sent = stub.calls.find((c) => c.url.endsWith('/spools/1/merge'))!;
-    expect(JSON.parse(sent.body!)).toEqual({ into: 8 });
+    expect(JSON.parse(sent.body!)).toEqual({ into: '8' });
     await expect.element(page.getByText('note 1')).not.toBeInTheDocument();
   });
 

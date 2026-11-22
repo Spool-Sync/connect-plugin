@@ -23,7 +23,7 @@ const LISTING = {
     is_custom: false,
     spools: n,
     assigned_spools: 0,
-    remaining_g: n * 100,
+    remaining_weight_g: n * 100,
     free_g: n * 100,
   })),
   total: 5,

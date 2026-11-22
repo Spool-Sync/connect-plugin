@@ -12,20 +12,9 @@ const DOWNLOAD = `${CATALOGUE}/download`;
 
 const FIN = '2026-10-02T10:00:00Z';
 const idle = { phase: 'idle' };
-const meta = (extra: Record<string, unknown> = {}) => ({
-  data_hash: 'abcdef0123456789abcdef',
-  last_modified: '2026-10-01',
-  brands: 12,
-  materials: 345,
-  packages: 678,
-  containers: 9,
-  skipped: 0,
-  imported_at: '2026-10-02T10:00:00Z',
-  ...extra,
-});
-const loaded = (extra = {}, imp: Record<string, unknown> = idle) => ({
+/** The catalogue's answer: whether one is loaded, and the last import's outcome. */
+const loaded = (imp: Record<string, unknown> = idle) => ({
   loaded: true,
-  meta: meta(extra),
   import: imp,
 });
 
@@ -55,20 +44,26 @@ describe('catalogue settings', () => {
     await expect.element(page.getByText('No catalogue loaded')).toBeVisible();
   });
 
-  it('shows the version, the counts and the short hash', async () => {
-    await draw([ok(loaded({ skipped: 3 }))]);
-    await expect.element(page.getByText('2026-10-01')).toBeVisible();
-    await expect.element(page.getByText('abcdef012345')).toBeVisible();
+  it('shows what the last import brought in, and when it finished', async () => {
+    await draw([
+      ok(loaded({ phase: 'idle', imported: 345, updated: 12, finished: FIN })),
+    ]);
     await expect
-      .element(page.getByTestId('materials'))
+      .element(page.getByTestId('imported'))
       .toHaveTextContent('345');
-    await expect.element(page.getByTestId('skipped')).toHaveTextContent('3');
+    await expect.element(page.getByTestId('updated')).toHaveTextContent('12');
+    await expect.element(page.getByTestId('finished')).toBeVisible();
   });
 
   it('leaves the skipped count away when it is 0', async () => {
-    await draw([ok(loaded())]);
-    await expect.element(page.getByTestId('materials')).toBeVisible();
+    await draw([ok(loaded({ phase: 'idle', imported: 5, updated: 0 }))]);
+    await expect.element(page.getByTestId('imported')).toBeVisible();
     expect(page.getByTestId('skipped').elements()).toHaveLength(0);
+  });
+
+  it('shows the skipped count when an import skipped rows', async () => {
+    await draw([ok(loaded({ phase: 'idle', imported: 5, skipped: 3 }))]);
+    await expect.element(page.getByTestId('skipped')).toHaveTextContent('3');
   });
 
   it('downloads, polls while it runs, then shows the new counts', async () => {
@@ -76,12 +71,7 @@ describe('catalogue settings', () => {
       [
         ok({ loaded: false, import: idle }),
         ok({ loaded: false, import: { phase: 'running' } }),
-        ok(
-          loaded(
-            { materials: 777 },
-            { phase: 'idle', finished: FIN, unchanged: false },
-          ),
-        ),
+        ok(loaded({ phase: 'idle', imported: 777, finished: FIN })),
       ],
       [ok({ loaded: false, import: { phase: 'running' } })],
     );
@@ -91,7 +81,7 @@ describe('catalogue settings', () => {
       .element(page.getByRole('button', { name: 'Download from GitHub' }))
       .toBeDisabled();
     await expect
-      .element(page.getByTestId('materials'), { timeout: 8000 })
+      .element(page.getByTestId('imported'), { timeout: 8000 })
       .toHaveTextContent('777');
     await expect.element(page.getByText('Catalogue updated')).toBeVisible();
     expect(stub.calls.some((c) => c.url.endsWith('/catalogue/download'))).toBe(
@@ -102,10 +92,10 @@ describe('catalogue settings', () => {
   it('says already up to date after a download that found nothing new', async () => {
     await draw(
       [
-        ok(loaded()),
-        ok(loaded({}, { phase: 'idle', finished: FIN, unchanged: true })),
+        ok(loaded({ phase: 'idle', imported: 0, updated: 0, finished: FIN })),
+        ok(loaded({ phase: 'idle', imported: 0, updated: 0, finished: FIN })),
       ],
-      [ok(loaded({}, { phase: 'running' }))],
+      [ok(loaded({ phase: 'running' }))],
     );
     await page.getByRole('button', { name: 'Download from GitHub' }).click();
     await expect
@@ -115,14 +105,16 @@ describe('catalogue settings', () => {
 
   it('claims no result on a plain visit', async () => {
     await draw([
-      ok(loaded({}, { phase: 'idle', finished: FIN, unchanged: false })),
+      ok(loaded({ phase: 'idle', imported: 4, updated: 0, finished: FIN })),
     ]);
-    await expect.element(page.getByTestId('materials')).toBeVisible();
+    await expect.element(page.getByTestId('imported')).toBeVisible();
     expect(page.getByTestId('result').elements()).toHaveLength(0);
   });
 
   it('shows the step an import failed at', async () => {
-    await draw([ok(loaded({}, { phase: 'failed', reason: 'catalogue' }))]);
+    await draw([
+      ok(loaded({ phase: 'failed', reason: 'catalogue', error: 'bad file' })),
+    ]);
     await expect
       .element(page.getByText(/downloaded a file that is not a catalogue/))
       .toBeVisible();
@@ -131,10 +123,10 @@ describe('catalogue settings', () => {
   it('polls on mount when an import already runs', async () => {
     await draw([
       ok({ loaded: false, import: { phase: 'running' } }),
-      ok(loaded({ materials: 55 })),
+      ok(loaded({ phase: 'idle', imported: 55, finished: FIN })),
     ]);
     await expect
-      .element(page.getByTestId('materials'), { timeout: 8000 })
+      .element(page.getByTestId('imported'), { timeout: 8000 })
       .toHaveTextContent('55');
   });
 
@@ -152,7 +144,7 @@ describe('catalogue settings', () => {
             type: 'about:blank',
             title: 'Conflict',
             status: 409,
-            code: 'materials/IMPORT_RUNNING',
+            code: 'spool-sync/IMPORT_RUNNING',
             detail: 'an import is already running',
           },
         },
@@ -164,8 +156,10 @@ describe('catalogue settings', () => {
   });
 
   it('shows viewers no button', async () => {
-    await draw([ok(loaded())], [], { mayOperate: false });
-    await expect.element(page.getByTestId('materials')).toBeVisible();
+    await draw([ok(loaded({ phase: 'idle', imported: 1 }))], [], {
+      mayOperate: false,
+    });
+    await expect.element(page.getByTestId('imported')).toBeVisible();
     // The access answer is in, so the missing button is a refusal.
     await vi.waitFor(() => {
       expect(heldList().mayOnlyRead).toBe(true);

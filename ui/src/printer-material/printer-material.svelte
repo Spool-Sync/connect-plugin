@@ -170,7 +170,7 @@
     if (slot.unassign === 'printing')
       return t('materials.tools.unloadPrinting');
     if (slot.unassign === 'busy') return t('materials.printer.busy');
-    if (slot.unassign !== '') return t('error.materials/TOOL_REFUSED');
+    if (slot.unassign !== '') return t('error.spool-sync/TOOL_REFUSED');
     if (loaded === undefined) return t('materials.tools.nothingLoaded');
     return undefined;
   };
@@ -294,7 +294,7 @@
           remainingGrams={view.leftG}
           disabledReason={why ??
             (tool.assign !== ''
-              ? t('error.materials/TOOL_REFUSED')
+              ? t('error.spool-sync/TOOL_REFUSED')
               : undefined)}
         >
           {#snippet panel(

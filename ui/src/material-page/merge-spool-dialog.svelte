@@ -48,14 +48,14 @@
     next: number | undefined;
     busy: boolean;
     fault: unknown;
-    onmerge: (into: number) => void;
+    onmerge: (into: string) => void;
     onclose: () => void;
   } = $props();
 
   const t = heldHost().t;
   const uid = $props.id();
 
-  let into = $state<number | undefined>(undefined);
+  let into = $state<string | undefined>(undefined);
   /** The printer spools of the material, undefined while they are read. */
   let targets = $state.raw<readonly Spool[] | undefined>(undefined);
   let readFault = $state.raw<unknown>(undefined);
@@ -133,7 +133,7 @@
         value={into === undefined ? '' : String(into)}
         aria-labelledby="{uid}-pick"
         onValueChange={(next: string) => {
-          into = Number(next);
+          into = next;
         }}
       >
         {#each targets ?? [] as target (target.id)}

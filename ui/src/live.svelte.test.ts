@@ -25,7 +25,7 @@ const streaming = (events: { type: string; payload?: unknown }[]) => {
 describe('following the module’s own changes', () => {
   it('asks for its own types and tells each change by its endpoint', async () => {
     const spool = {
-      spool_id: 8,
+      spool_id: '8',
       material_uuid: 'm-1',
       remaining_weight_g: 499,
     };

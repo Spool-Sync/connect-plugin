@@ -21,7 +21,6 @@
     LINKED_ROW,
     MaterialSwatch,
     PrinterGlyphIcon,
-    Progress,
     ROW_LINK,
     TableCell,
     TableRow,
@@ -44,12 +43,6 @@
   } = $props();
 
   const list = heldList();
-  // A row with no spools has nothing to measure against.
-  const capacity = $derived(
-    row.capacity_g === undefined || row.capacity_g <= 0
-      ? undefined
-      : row.capacity_g,
-  );
   const host = heldHost();
   const t = host.t;
 
@@ -115,21 +108,8 @@
     <span class={NAME}>{t('materials.column.weight')}</span>
     <div class="flex flex-col items-end gap-1 @md:w-full @md:items-start">
       <span class="text-sm whitespace-nowrap">
-        {capacity === undefined
-          ? t('materials.row.weight', { kg: kilograms(row.remaining_g) })
-          : t('materials.row.weightOf', {
-              kg: kilograms(row.remaining_g),
-              full: kilograms(capacity),
-            })}
+        {t('materials.row.weight', { kg: kilograms(row.remaining_weight_g) })}
       </span>
-      {#if capacity !== undefined}
-        <Progress
-          value={Math.min(row.remaining_g, capacity)}
-          max={capacity}
-          aria-label={t('materials.row.bar', { name: row.name })}
-          class="w-full min-w-24"
-        />
-      {/if}
     </div>
   </TableCell>
 

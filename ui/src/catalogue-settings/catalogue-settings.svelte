@@ -37,7 +37,9 @@
       ? ([
           ['imported', status.import.imported ?? 0],
           ['updated', status.import.updated ?? 0],
-          ['skipped', status.import.skipped ?? 0],
+          ...((status.import.skipped ?? 0) > 0
+            ? ([['skipped', status.import.skipped ?? 0]] as const)
+            : []),
         ] as const)
       : [],
   );
@@ -96,13 +98,15 @@
     {:else if status?.loaded}
       <div class="flex flex-col gap-form-note">
         {#each counts as [name, value] (name)}
-          <SettingsRow label={t(`materials.settings.${name}`)}>
+          <SettingsRow label={t(`materials.settings.count.${name}`)}>
             {#snippet control()}<span data-part={name}>{value}</span>{/snippet}
           </SettingsRow>
         {/each}
         {#if status.import.finished}
           <SettingsRow label={t('materials.settings.finished')}>
-            {#snippet control()}{formatDateTime(status.import.finished ?? "")}{/snippet}
+            {#snippet control()}<span data-part="finished"
+                >{formatDateTime(status.import.finished ?? '')}</span
+              >{/snippet}
           </SettingsRow>
         {/if}
       </div>

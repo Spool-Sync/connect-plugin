@@ -8,6 +8,26 @@
 import type { ModuleHost } from '@prusa/connect-ui/slots';
 import { bind, type components, type operations } from './client';
 
+/**
+ * A detail as a list row, for the picker that reads a material it was handed
+ * from a row. The detail's fields are all optional in the contract; a field
+ * it lacks reads as the empty value the row takes.
+ */
+export const rowOf = (detail: Detail): Row => ({
+  uuid: detail.uuid ?? '',
+  name: detail.name ?? '',
+  brand_name: detail.brand_name ?? '',
+  class: detail.class ?? 'FFF',
+  type: detail.type ?? '',
+  color_rgba: detail.color_rgba ?? '',
+  is_favourite: detail.is_favourite ?? false,
+  is_custom: detail.is_custom ?? false,
+  spools: detail.spools ?? 0,
+  assigned_spools: detail.assigned_spools ?? 0,
+  remaining_weight_g: detail.remaining_weight_g ?? 0,
+  free_g: detail.free_g ?? 0,
+});
+
 /** One material of the list, wherever it comes from. */
 export type Row = components['schemas']['Row'];
 

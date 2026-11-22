@@ -1,21 +1,21 @@
 <!--
-  The fields of a custom material, in four sections: what the material is, how
-  it prints, what it is physically, and how it is classified. It sends what
-  was typed to `onsave` and makes no request itself, so the add dialog and the
-  Custom material dialog create with it and the material page edits with it:
-  `initial` fills the fields and `submitLabel` names the button.
+  The fields of a custom material the contract holds: what the material is (its
+  class, manufacturer, type, name and abbreviation), its primary colour, and its
+  density. It sends what was typed to `onsave` and makes no request itself, so
+  the add dialog and the Custom material dialog create with it and the material
+  page edits with it: `initial` fills the fields and `submitLabel` names the
+  button.
 
   The manufacturer, the name and the primary colour are required, and the type
   too unless the material is a resin; the button stays off until they are
-  filled. A preset fills a filament's temperatures and density, all of them
-  still editable. The name follows the type and the manufacturer until the
-  person writes one of their own.
+  filled. A preset fills a filament's density, still editable. The name follows
+  the type and the manufacturer until the person writes one of their own.
 
-  A number left empty is left out, which the module keeps as unknown. A resin
-  has no type and no temperatures, so none are sent for it.
+  A number left empty is left out, which the module keeps as unknown. Temperatures,
+  nozzle sizes, hardness and certifications are not in the SpoolSync contract, so
+  this form does not ask for them.
 -->
 <script lang="ts">
-  import PlusIcon from '@lucide/svelte/icons/plus';
   import {
     Button,
     Chip,
@@ -29,20 +29,13 @@
     Input,
     SwatchPicker,
   } from '@prusa/connect-ui/primitives';
-  import { onMount, type Snippet, untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
 
   import type { MaterialFields } from '../api';
   import { heldHost } from '../host';
   import { heldList } from '../list.svelte';
   import FaultNote from '../materials-page/fault-note.svelte';
-  import {
-    CERTIFICATIONS,
-    MAX_SECONDARY,
-    PALETTE,
-    PRESETS,
-    type PresetValues,
-    TAGS,
-  } from './custom-options';
+  import { PALETTE, PRESETS } from './custom-options';
 
   let {
     initial,
@@ -67,82 +60,6 @@
   const t = heldHost().t;
   const list = heldList();
 
-  type Numeric =
-    | keyof PresetValues
-    | 'transmission_distance'
-    | 'hardness_shore_a'
-    | 'hardness_shore_d';
-
-  /** A filament's temperatures, two to a row; a resin has none of them. */
-  const TEMPERATURES: readonly { key: Numeric; label: string }[] = [
-    { key: 'min_print_temp', label: 'materials.custom.minPrint' },
-    { key: 'max_print_temp', label: 'materials.custom.maxPrint' },
-    { key: 'min_bed_temp', label: 'materials.custom.minBed' },
-    { key: 'max_bed_temp', label: 'materials.custom.maxBed' },
-    { key: 'preheat_temp', label: 'materials.custom.preheat' },
-    { key: 'chamber_temp', label: 'materials.custom.chamber' },
-    { key: 'min_chamber_temp', label: 'materials.custom.minChamber' },
-    { key: 'max_chamber_temp', label: 'materials.custom.maxChamber' },
-    { key: 'drying_temp', label: 'materials.custom.dryingTemp' },
-    { key: 'drying_time_min', label: 'materials.custom.dryingTime' },
-  ];
-  const PHYSICAL: readonly {
-    key: Numeric;
-    label: string;
-    filament?: true;
-  }[] = [
-    { key: 'density', label: 'materials.custom.density' },
-    {
-      key: 'min_nozzle_diameter',
-      label: 'materials.custom.minNozzle',
-      filament: true,
-    },
-    { key: 'transmission_distance', label: 'materials.custom.td' },
-    { key: 'hardness_shore_a', label: 'materials.custom.shoreA' },
-    { key: 'hardness_shore_d', label: 'materials.custom.shoreD' },
-  ];
-  /** What a resin is never sent: it has no temperatures and no nozzle. */
-  const FILAMENT_ONLY = new Set<Numeric>([
-    ...TEMPERATURES.map((n) => n.key),
-    'min_nozzle_diameter',
-  ]);
-  /** What a preset writes, each one cleared when the preset gives none. */
-  const PRESET_KEYS: readonly (keyof PresetValues)[] = [
-    'density',
-    'min_print_temp',
-    'max_print_temp',
-    'preheat_temp',
-    'min_bed_temp',
-    'max_bed_temp',
-    'chamber_temp',
-    'min_chamber_temp',
-    'max_chamber_temp',
-    'drying_temp',
-    'drying_time_min',
-    'min_nozzle_diameter',
-  ];
-  /** Whole numbers on the module's side; the rest take decimals. */
-  const DECIMAL = new Set<Numeric>([
-    'density',
-    'min_nozzle_diameter',
-    'transmission_distance',
-    'hardness_shore_a',
-    'hardness_shore_d',
-  ]);
-  const ALL: readonly Numeric[] = [...TEMPERATURES, ...PHYSICAL].map(
-    (n) => n.key,
-  );
-  const TAGS_BY_NAME = $derived(
-    TAGS.map((name) => ({ name, label: t(`materials.tag.${name}`) })).sort(
-      (a, b) => a.label.localeCompare(b.label),
-    ),
-  );
-  const PRIMARY_SWATCHES = PALETTE.map((hex) => ({
-    key: hex,
-    hex,
-    label: hex,
-  }));
-
   // The form is made new each time it is shown, so it starts from `initial`.
   const start = untrack(() => initial);
   let klass = $state<'FFF' | 'SLA'>(
@@ -158,19 +75,7 @@
   );
   // The picker has no alpha, so an edit keeps the one the material had.
   const alpha = (start?.color_rgba ?? '').slice(7, 9);
-  let secondary = $state<string[]>([...(start?.secondary_colors ?? [])]);
-  let ral = $state(start?.ral_code ?? '');
-  let certifications = $state<string[]>([...(start?.certifications ?? [])]);
-  let tags = $state<string[]>([...(start?.tags ?? [])]);
-  // The numbers as typed, so an emptied field is left out rather than sent as 0.
-  const numbers = $state<Partial<Record<Numeric, string>>>(
-    Object.fromEntries(
-      ALL.map((key) => {
-        const value = start?.[key];
-        return [key, value === undefined ? '' : String(value)];
-      }),
-    ),
-  );
+  let density = $state(start?.density === undefined ? '' : String(start.density));
 
   onMount(() => {
     void list.readFacets();
@@ -221,15 +126,9 @@
   const applyPreset = (chosen: (typeof PRESETS)[number]): void => {
     preset = chosen.type;
     type = chosen.type;
-    for (const key of PRESET_KEYS) {
-      const value = chosen.values[key];
-      numbers[key] = value === undefined ? '' : String(value);
-    }
+    density = chosen.values.density === undefined ? '' : String(chosen.values.density);
     follow();
   };
-
-  const toggle = (items: string[], item: string): string[] =>
-    items.includes(item) ? items.filter((i) => i !== item) : [...items, item];
 
   const typed = (event: Event): string =>
     (event.currentTarget as HTMLInputElement).value;
@@ -237,58 +136,32 @@
   const submit = (event: SubmitEvent): void => {
     event.preventDefault();
     if (missing || busy || primary === undefined) return;
-    const kept = ALL.filter(
-      (key) =>
-        (numbers[key] ?? '') !== '' && !(resin && FILAMENT_ONLY.has(key)),
-    );
+    const value = Number(density);
     onsave({
-      // A diameter the form does not ask keeps what the material had.
-      ...(start?.diameter_um === undefined
-        ? {}
-        : { diameter_um: start.diameter_um }),
-      ...Object.fromEntries(
-        kept.map((key) => {
-          const value = Number(numbers[key]);
-          return [key, DECIMAL.has(key) ? value : Math.round(value)];
-        }),
-      ),
       name: name.trim(),
       class: klass,
       brand_name: brand.trim(),
       type: resin ? '' : type,
       abbreviation: abbreviation.trim(),
       color_rgba: `${primary}${alpha}`,
-      secondary_colors: secondary,
-      ral_code: ral.trim(),
-      certifications,
-      tags,
+      ...(density.trim() === '' || !Number.isFinite(value)
+        ? {}
+        : { density: value }),
+      // A diameter the form does not ask keeps what the material had.
+      ...(start?.diameter_um === undefined
+        ? {}
+        : { diameter_um: start.diameter_um }),
     });
   };
 
   const required = (label: string): string => `${label} *`;
+
+  const PRIMARY_SWATCHES = PALETTE.map((hex) => ({
+    key: hex,
+    hex,
+    label: hex,
+  }));
 </script>
-
-{#snippet block(heading: string, body: Snippet)}
-  <section class="flex flex-col gap-4 pt-6 first:pt-0">
-    <h3 class="text-sm font-semibold">{heading}</h3>
-    {@render body()}
-  </section>
-{/snippet}
-
-{#snippet numberField(key: Numeric, label: string)}
-  <Field
-    label={t(label)}
-    control={Input}
-    controlProps={{
-      name: key,
-      type: 'number',
-      inputmode: 'decimal',
-      step: 'any',
-      value: numbers[key] ?? '',
-      oninput: (e: Event) => (numbers[key] = typed(e)),
-    }}
-  />
-{/snippet}
 
 {#snippet identity()}
   {#if !filamentOnly}
@@ -409,7 +282,23 @@
       {@render abbreviationField()}
     {/if}
   </div>
+{/snippet}
 
+{#snippet abbreviationField()}
+  <Field
+    label={t('materials.custom.abbreviation')}
+    control={Input}
+    controlProps={{
+      name: 'abbreviation',
+      autocomplete: 'off',
+      placeholder: type,
+      value: abbreviation,
+      oninput: (e: Event) => (abbreviation = typed(e)),
+    }}
+  />
+{/snippet}
+
+{#snippet colourField()}
   <div class="flex flex-col gap-2">
     <p class="text-sm font-medium">
       {required(t('materials.custom.primary'))}
@@ -434,122 +323,22 @@
       {/if}
     </div>
   </div>
-
-  {#if !compact}
-    {@render colourDetails()}
-  {/if}
-{/snippet}
-
-{#snippet abbreviationField()}
-  <Field
-    label={t('materials.custom.abbreviation')}
-    control={Input}
-    controlProps={{
-      name: 'abbreviation',
-      autocomplete: 'off',
-      placeholder: type,
-      value: abbreviation,
-      oninput: (e: Event) => (abbreviation = typed(e)),
-    }}
-  />
-{/snippet}
-
-{#snippet colourDetails()}
-  <div class="flex flex-col gap-2">
-    <p class="text-sm font-medium">{t('materials.custom.secondary')}</p>
-    <div class="flex flex-wrap items-center gap-2">
-      {#each secondary as hex, index (index)}
-        <ColorInput
-          label={t('materials.custom.secondaryOne', { n: index + 1 })}
-          value={hex.slice(0, 7)}
-          oninput={(next: string) => (secondary[index] = next)}
-        />
-      {/each}
-      {#if secondary.length < MAX_SECONDARY}
-        <Chip onclick={() => (secondary = [...secondary, '#000000'])}>
-          <PlusIcon aria-hidden="true" class="size-3" />
-          {t('materials.custom.addColour')}
-        </Chip>
-      {/if}
-      {#if secondary.length > 0}
-        <Chip onclick={() => (secondary = secondary.slice(0, -1))}>
-          {t('materials.custom.removeColour')}
-        </Chip>
-      {/if}
-    </div>
-  </div>
-
-  <div class="pair grid gap-4">
-    <Field
-      label={t('materials.custom.ral')}
-      control={Input}
-      controlProps={{
-        name: 'ral_code',
-        autocomplete: 'off',
-        value: ral,
-        oninput: (e: Event) => (ral = typed(e)),
-      }}
-    />
-  </div>
-{/snippet}
-
-{#snippet temperatures()}
-  <div class="pair grid gap-4">
-    {#each TEMPERATURES as n (n.key)}
-      {@render numberField(n.key, n.label)}
-    {/each}
-  </div>
 {/snippet}
 
 {#snippet physical()}
   <div class="pair grid gap-4">
-    {#each PHYSICAL.filter((n) => !(resin && n.filament)) as n (n.key)}
-      {@render numberField(n.key, n.label)}
-    {/each}
-  </div>
-{/snippet}
-
-{#snippet classification()}
-  <div class="flex flex-col gap-2">
-    <p class="text-sm font-medium">{t('materials.custom.certifications')}</p>
-    <div
-      class="flex flex-wrap gap-2"
-      role="group"
-      aria-label={t('materials.custom.certifications')}
-    >
-      {#each CERTIFICATIONS as c (c.name)}
-        <Chip
-          selected={certifications.includes(c.name)}
-          onclick={() => (certifications = toggle(certifications, c.name))}
-        >
-          {c.label}
-        </Chip>
-      {/each}
-    </div>
-  </div>
-  <div class="flex flex-col gap-2">
-    <p class="text-sm font-medium">{t('materials.details.tags')}</p>
-    <div
-      class={[
-        'rounded-md border border-border p-2',
-        { 'max-h-48 overflow-y-auto': !compact },
-      ]}
-    >
-      <div
-        class="flex flex-wrap gap-2"
-        role="group"
-        aria-label={t('materials.details.tags')}
-      >
-        {#each TAGS_BY_NAME as tag (tag.name)}
-          <Chip
-            selected={tags.includes(tag.name)}
-            onclick={() => (tags = toggle(tags, tag.name))}
-          >
-            {tag.label}
-          </Chip>
-        {/each}
-      </div>
-    </div>
+    <Field
+      label={t('materials.custom.density')}
+      control={Input}
+      controlProps={{
+        name: 'density',
+        type: 'number',
+        inputmode: 'decimal',
+        step: 'any',
+        value: density,
+        oninput: (e: Event) => (density = typed(e)),
+      }}
+    />
   </div>
 {/snippet}
 
@@ -561,6 +350,7 @@
   <FaultNote {fault} />
   {#if compact}
     {@render identity()}
+    {@render colourField()}
     <Collapsible class="rounded-sm border border-border">
       <CollapsibleTrigger
         type="button"
@@ -573,24 +363,21 @@
         class="compact-options grid gap-4 border-t border-border p-3"
       >
         {@render abbreviationField()}
-        {@render colourDetails()}
-        <h3 class="text-sm font-medium">
-          {t('materials.custom.temperatures')}
-        </h3>
-        {@render temperatures()}
-        <h3 class="text-sm font-medium">{t('materials.custom.physical')}</h3>
         {@render physical()}
-        {@render classification()}
       </CollapsibleContent>
     </Collapsible>
   {:else}
     <div class="flex flex-col gap-6 divide-y divide-border">
-      {@render block(t('materials.custom.identity'), identity)}
-      {#if !resin}
-        {@render block(t('materials.custom.temperatures'), temperatures)}
-      {/if}
-      {@render block(t('materials.custom.physical'), physical)}
-      {@render block(t('materials.custom.classification'), classification)}
+      <div class="flex flex-col gap-4">
+        {@render identity()}
+      </div>
+      <div class="flex flex-col gap-4 pt-6">
+        {@render colourField()}
+      </div>
+      <div class="flex flex-col gap-4 pt-6">
+        <h3 class="text-sm font-semibold">{t('materials.custom.physical')}</h3>
+        {@render physical()}
+      </div>
     </div>
   {/if}
   <DialogFooter>
