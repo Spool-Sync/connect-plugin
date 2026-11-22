@@ -683,15 +683,13 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 // material uuid, else a custom one made from what the printer reports.
 func (s *service) materialForTag(r *http.Request, rep *connectorapi.ReportedMaterial) (string, error) {
 	if rep.MaterialUUID != "" {
-		all, err := s.ss.FilamentTypes(r.Context(), "")
-		if err != nil {
-			return "", err
-		}
+		ft, err := s.ss.FilamentTypeByOpt(r.Context(), rep.MaterialUUID)
 
-		for _, ft := range all {
-			if ft.OptMaterialUUID != nil && *ft.OptMaterialUUID == rep.MaterialUUID {
-				return ft.ID, nil
-			}
+		switch {
+		case err == nil:
+			return ft.ID, nil
+		case !errors.Is(err, spoolsync.ErrNotFound):
+			return "", err
 		}
 	}
 

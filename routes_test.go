@@ -9,8 +9,12 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -45,6 +49,63 @@ func newFakeSS() *fakeSS {
 		},
 		spools: map[string]map[string]any{}, locs: map[string]string{},
 	}
+}
+
+// typePage answers GET /filament-types/page as SpoolSync does, for the filters the
+// module sends. The caller holds f.mu.
+func (f *fakeSS) typePage(q url.Values) map[string]any {
+	split := func(v string) []string {
+		if v == "" {
+			return nil
+		}
+
+		return strings.Split(v, ",")
+	}
+	only, not := split(q.Get("ids")), split(q.Get("exclude"))
+	search := strings.ToLower(q.Get("search"))
+
+	rows := []map[string]any{}
+
+	for id, t := range f.types {
+		name, _ := t["name"].(string)
+		brand, _ := t["brand"].(string)
+		material, _ := t["material"].(string)
+
+		switch {
+		case only != nil && !slices.Contains(only, id):
+		case slices.Contains(not, id):
+		case search != "" && !strings.Contains(strings.ToLower(name+" "+brand+" "+material), search):
+		case q.Get("brand") != "" && !strings.EqualFold(q.Get("brand"), brand):
+		case q.Get("material") != "" && !strings.EqualFold(q.Get("material"), material):
+		case q.Get("source") == "custom" && t["custom"] != true:
+		case q.Get("source") == "openprinttag" && t["optMaterialUuid"] == nil:
+		default:
+			rows = append(rows, t)
+		}
+	}
+
+	key := map[string]string{"brand": "brand", "material": "material"}[q.Get("orderBy")]
+	if key == "" {
+		key = "name"
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, _ := rows[i][key].(string)
+		b, _ := rows[j][key].(string)
+
+		if q.Get("desc") == "true" {
+			return a > b
+		}
+
+		return a < b
+	})
+
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	start := min(offset, len(rows))
+	end := min(start+max(limit, 1), len(rows))
+
+	return map[string]any{"items": rows[start:end], "total": len(rows), "offset": offset, "limit": limit}
 }
 
 func (f *fakeSS) id(prefix string) string {
@@ -105,6 +166,32 @@ func (f *fakeSS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		reply(200, out)
+	case r.Method == "GET" && p == "/filament-types/page":
+		reply(200, f.typePage(r.URL.Query()))
+	case r.Method == "GET" && p == "/filament-types/kinds":
+		seen := map[string]bool{}
+		out := []string{}
+
+		for _, t := range f.types {
+			if m, _ := t["material"].(string); m != "" && !seen[m] {
+				seen[m] = true
+				out = append(out, m)
+			}
+		}
+
+		slices.Sort(out)
+		reply(200, out)
+	case r.Method == "GET" && strings.HasPrefix(p, "/filament-types/by-opt/"):
+		want := strings.TrimPrefix(p, "/filament-types/by-opt/")
+		for _, t := range f.types {
+			if t["optMaterialUuid"] == want {
+				reply(200, t)
+
+				return
+			}
+		}
+
+		reply(404, map[string]any{"message": "no"})
 	case r.Method == "GET" && strings.HasPrefix(p, "/filament-types/") && !strings.Contains(p, "sync"):
 		t, ok := f.types[strings.TrimPrefix(p, "/filament-types/")]
 		if !ok {

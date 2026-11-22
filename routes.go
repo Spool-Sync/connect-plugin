@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"io"
+	"maps"
 	"math"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -131,18 +133,12 @@ func catalogueOf(st spoolsync.SyncStatus, loaded bool) catalogueView {
 
 // loadedCatalogue is true when SpoolSync holds a filament type from the OpenPrintTag database.
 func (s *service) loadedCatalogue(r *http.Request) (bool, error) {
-	all, err := s.ss.FilamentTypes(r.Context(), "")
+	page, err := s.ss.FilamentTypePage(r.Context(), spoolsync.TypeQuery{Source: "openprinttag", Limit: 1})
 	if err != nil {
 		return false, err
 	}
 
-	for _, ft := range all {
-		if ft.OptMaterialUUID != nil {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return page.Total > 0, nil
 }
 
 func (s *service) catalogue(w http.ResponseWriter, r *http.Request, _ string) {
@@ -212,24 +208,17 @@ func (s *service) brands(w http.ResponseWriter, r *http.Request, _ string) {
 }
 
 func (s *service) types(w http.ResponseWriter, r *http.Request, _ string) {
-	all, err := s.ss.FilamentTypes(r.Context(), "")
+	types, err := s.ss.FilamentKinds(r.Context())
 	if err != nil {
 		s.spoolSyncFailed(w, "the materials", err)
 
 		return
 	}
 
-	seen := map[string]bool{}
-	types := []string{}
-
-	for _, ft := range all {
-		if ft.Material != "" && !seen[ft.Material] {
-			seen[ft.Material] = true
-			types = append(types, ft.Material)
-		}
+	if types == nil {
+		types = []string{}
 	}
 
-	sort.Strings(types)
 	answer(w, http.StatusOK, map[string]any{"types": types})
 }
 
@@ -251,70 +240,124 @@ type rowView struct {
 	FreeG          float64 `json:"free_g"`
 }
 
-// materialRows is every material with its stock, from SpoolSync's filament types and spools.
-func (s *service) materialRows(r *http.Request, by string) ([]rowView, float64, int, error) {
-	types, err := s.ss.FilamentTypes(r.Context(), "")
-	if err != nil {
-		return nil, 0, 0, err
-	}
+// stock is what the spools of one material add up to.
+type stock struct {
+	spools, assigned int
+	remaining, free  float64
+}
 
-	spools, err := s.spoolsAll(r.Context())
-	if err != nil {
-		return nil, 0, 0, err
-	}
-
-	favs, err := s.st.Favourites(r.Context(), by)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-
-	fav := map[string]bool{}
-	for _, id := range favs {
-		fav[id] = true
-	}
-
+// stockByType adds every spool up per filament type, and in all. Archived spools count for nothing.
+func (s *service) stockByType(spools []spoolsync.Spool) (map[string]stock, float64, int) {
 	placed := s.placements()
-	rows := map[string]*rowView{}
+	by := map[string]stock{}
 
-	for _, ft := range types {
-		rows[ft.ID] = &rowView{
-			UUID: ft.ID, Name: ft.Name, BrandName: ft.Brand, Class: "FFF", Type: ft.Material,
-			ColorRGBA: colourRGBA(ft.Color), IsFavourite: fav[ft.ID], IsCustom: ft.Custom,
-		}
-	}
+	var totalG float64
 
-	var stockG float64
-	var stockSpools int
+	var totalSpools int
 
 	for _, sp := range spools {
 		if sp.ArchivedAt != nil {
 			continue
 		}
 
-		stockG += sp.RemainingG
-		stockSpools++
+		totalG += sp.RemainingG
+		totalSpools++
 
-		row := rows[sp.FilamentTypeID]
-		if row == nil {
+		st := by[sp.FilamentTypeID]
+		st.spools++
+		st.remaining += sp.RemainingG
+
+		if _, on := placed[sp.ID]; on {
+			st.assigned++
+		} else {
+			st.free += sp.RemainingG
+		}
+
+		by[sp.FilamentTypeID] = st
+	}
+
+	return by, totalG, totalSpools
+}
+
+// rowOf is one material in Materials' list shape.
+func rowOf(ft spoolsync.FilamentType, st stock, favourite bool) rowView {
+	return rowView{
+		UUID: ft.ID, Name: ft.Name, BrandName: ft.Brand, Class: "FFF", Type: ft.Material,
+		ColorRGBA: colourRGBA(ft.Color), IsFavourite: favourite, IsCustom: ft.Custom,
+		Spools: st.spools, AssignedSpools: st.assigned, RemainingG: st.remaining, FreeG: st.free,
+	}
+}
+
+// listing is what every materials read starts from: the spools and their stock, the
+// person's favourites, and the materials a person cares about, which are few: those with
+// a spool, the favourites, and the custom ones. The rest of the catalogue (some 16,500
+// after an import) stays in SpoolSync and is read a page at a time.
+type listing struct {
+	stock       map[string]stock
+	stockG      float64
+	stockSpools int
+	favourite   map[string]bool
+	pinned      []rowView
+	pinnedIDs   []string
+}
+
+func (s *service) listingOf(r *http.Request, by string) (listing, error) {
+	spools, err := s.spoolsAll(r.Context())
+	if err != nil {
+		return listing{}, err
+	}
+
+	favs, err := s.st.Favourites(r.Context(), by)
+	if err != nil {
+		return listing{}, err
+	}
+
+	l := listing{favourite: map[string]bool{}}
+	l.stock, l.stockG, l.stockSpools = s.stockByType(spools)
+
+	want := map[string]bool{}
+
+	for _, id := range favs {
+		l.favourite[id] = true
+		want[id] = true
+	}
+
+	for _, sp := range spools {
+		if sp.FilamentTypeID != "" {
+			want[sp.FilamentTypeID] = true
+		}
+	}
+
+	ids := make([]string, 0, len(want))
+	for id := range want {
+		ids = append(ids, id)
+	}
+
+	sort.Strings(ids)
+
+	types, err := s.ss.FilamentTypesByID(r.Context(), ids)
+	if err != nil {
+		return listing{}, err
+	}
+
+	custom, err := s.ss.FilamentTypePage(r.Context(), spoolsync.TypeQuery{Source: "custom", Limit: 200})
+	if err != nil {
+		return listing{}, err
+	}
+
+	seen := map[string]bool{}
+
+	for _, ft := range append(types, custom.Items...) {
+		if seen[ft.ID] {
 			continue
 		}
 
-		row.Spools++
-		row.RemainingG += sp.RemainingG
-
-		if _, on := placed[sp.ID]; on {
-			row.AssignedSpools++
-		} else {
-			row.FreeG += sp.RemainingG
-		}
+		seen[ft.ID] = true
+		l.pinned = append(l.pinned, rowOf(ft, l.stock[ft.ID], l.favourite[ft.ID]))
+		l.pinnedIDs = append(l.pinnedIDs, ft.ID)
 	}
 
-	out := make([]rowView, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, *row)
-	}
-
-	return out, stockG, stockSpools, nil
+	return l, nil
 }
 
 func (s *service) listMaterials(w http.ResponseWriter, r *http.Request, by string) {
@@ -325,29 +368,31 @@ func (s *service) listMaterials(w http.ResponseWriter, r *http.Request, by strin
 
 	q := r.URL.Query()
 
-	rows, stockG, stockSpools, err := s.materialRows(r, by)
+	favourites, _ := boolParam(w, r, "favourites")
+	custom, _ := boolParam(w, r, "custom")
+	inStock, _ := boolParam(w, r, "in_stock")
+	assigned, _ := boolParam(w, r, "assigned")
+
+	l, err := s.listingOf(r, by)
 	if err != nil {
 		s.spoolSyncFailed(w, "the materials", err)
 
 		return
 	}
 
-	favourites, _ := boolParam(w, r, "favourites")
-	custom, _ := boolParam(w, r, "custom")
-	inStock, _ := boolParam(w, r, "in_stock")
-	assigned, _ := boolParam(w, r, "assigned")
-
 	needle := trimLower(q.Get("q"))
 	brand, typ := trimLower(q.Get("brand")), trimLower(q.Get("type"))
+	class := q.Get("class")
+	order, desc := q.Get("order"), q.Get("desc") == "true"
 
-	kept := rows[:0]
+	kept := []rowView{}
 
-	for _, row := range rows {
+	for _, row := range l.pinned {
 		switch {
 		case needle != "" && !strings.Contains(trimLower(row.Name+" "+row.BrandName+" "+row.Type), needle):
 		case brand != "" && trimLower(row.BrandName) != brand:
 		case typ != "" && trimLower(row.Type) != typ:
-		case q.Get("class") != "" && !strings.EqualFold(q.Get("class"), row.Class):
+		case class != "" && !strings.EqualFold(class, row.Class):
 		case favourites && !row.IsFavourite:
 		case custom && !row.IsCustom:
 		case inStock && row.Spools == 0:
@@ -357,21 +402,80 @@ func (s *service) listMaterials(w http.ResponseWriter, r *http.Request, by strin
 		}
 	}
 
-	sortRows(kept, q.Get("order"), q.Get("desc") == "true")
+	stockOf := map[string]any{"stock_g": l.stockG, "stock_spools": l.stockSpools}
+	reply := func(rows []rowView, total, end int) {
+		if rows == nil {
+			rows = []rowView{}
+		}
 
-	total := len(kept)
-	if offset > total {
-		offset = total
+		body := map[string]any{"rows": rows, "total": total, "next": nextOffset(end, total)}
+		maps.Copy(body, stockOf)
+		answer(w, http.StatusOK, body)
 	}
 
-	end := min(offset+limit, total)
+	// Favourites, custom, in stock and assigned are all among the pinned materials, and
+	// so is every material of another class (SpoolSync holds FFF only): no catalogue read.
+	if favourites || custom || inStock || assigned || (class != "" && !strings.EqualFold(class, "FFF")) {
+		sortRows(kept, order, desc)
 
-	page := kept[offset:end]
+		total := len(kept)
+		start := min(offset, total)
+		end := min(start+limit, total)
+		reply(kept[start:end], total, end)
 
-	answer(w, http.StatusOK, map[string]any{
-		"rows": page, "total": total, "next": nextOffset(end, total),
-		"stock_g": stockG, "stock_spools": stockSpools,
-	})
+		return
+	}
+
+	remote := spoolsync.TypeQuery{Search: q.Get("q"), Brand: q.Get("brand"), Material: q.Get("type")}
+
+	// Ordered by a column: SpoolSync orders the whole catalogue, and the stock is added on.
+	if column := map[string]string{"name": "name", "brand": "brand", "type": "material"}[order]; column != "" {
+		remote.OrderBy, remote.Desc, remote.Offset, remote.Limit = column, desc, offset, limit
+
+		page, err := s.ss.FilamentTypePage(r.Context(), remote)
+		if err != nil {
+			s.spoolSyncFailed(w, "the materials", err)
+
+			return
+		}
+
+		rows := make([]rowView, 0, len(page.Items))
+		for _, ft := range page.Items {
+			rows = append(rows, rowOf(ft, l.stock[ft.ID], l.favourite[ft.ID]))
+		}
+
+		reply(rows, page.Total, offset+len(rows))
+
+		return
+	}
+
+	// Materials' own order (or by spools or weight): the pinned materials first, as
+	// sortRows orders them, then the rest of the catalogue by name. Every material that
+	// is not pinned has no spool and is no favourite, so it sorts after them all.
+	sortRows(kept, order, desc)
+
+	pinned := len(kept)
+	start := min(offset, pinned)
+	rows := append([]rowView{}, kept[start:min(offset+limit, pinned)]...)
+
+	remote.Exclude, remote.OrderBy = l.pinnedIDs, "name"
+	remote.Offset = max(offset-pinned, 0)
+	remote.Limit = max(limit-len(rows), 1)
+
+	page, err := s.ss.FilamentTypePage(r.Context(), remote)
+	if err != nil {
+		s.spoolSyncFailed(w, "the materials", err)
+
+		return
+	}
+
+	if len(rows) < limit {
+		for _, ft := range page.Items {
+			rows = append(rows, rowOf(ft, stock{}, false))
+		}
+	}
+
+	reply(rows, pinned+page.Total, offset+len(rows))
 }
 
 // nextOffset is the offset of the next page, or nil on the last one.
@@ -440,24 +544,22 @@ func (s *service) material(w http.ResponseWriter, r *http.Request, by string) {
 		return
 	}
 
-	rows, _, _, err := s.materialRows(r, by)
+	spools, err := s.spoolsAll(r.Context())
 	if err != nil {
 		s.spoolSyncFailed(w, "the material", err)
 
 		return
 	}
 
-	var row rowView
-	for _, x := range rows {
-		if x.UUID == uuid {
-			row = x
-		}
+	favs, err := s.st.Favourites(r.Context(), by)
+	if err != nil {
+		s.storeFailed(w, r, err)
+
+		return
 	}
 
-	detail := map[string]any{"row": row, "packages": []any{}}
-	if ft.Custom {
-		detail["custom"] = customOf(ft)
-	}
+	st, _, _ := s.stockByType(spools)
+	row := rowOf(ft, st[ft.ID], slices.Contains(favs, ft.ID))
 
 	// Materials' detail is the row with its extra fields beside it.
 	answer(w, http.StatusOK, map[string]any{

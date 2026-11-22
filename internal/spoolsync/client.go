@@ -378,6 +378,108 @@ func (c *Client) FilamentType(ctx context.Context, id string) (FilamentType, err
 	return w.filamentType(), nil
 }
 
+// TypeQuery is one page of filament types, as GET /filament-types/page reads it.
+// Every field is optional.
+type TypeQuery struct {
+	Search, Brand, Material string
+	// Source is "openprinttag", "custom" or "catalogue".
+	Source string
+	// IDs keeps only these types; Exclude leaves these out.
+	IDs, Exclude []string
+	// OrderBy is "name", "brand" or "material".
+	OrderBy       string
+	Desc          bool
+	Offset, Limit int
+}
+
+// TypePage is one page of filament types and how many matched in all.
+type TypePage struct {
+	Items []FilamentType
+	Total int
+}
+
+// FilamentTypePage reads one page of filament types. After a catalogue import
+// SpoolSync holds some 16,500, so nothing reads them all.
+func (c *Client) FilamentTypePage(ctx context.Context, q TypeQuery) (TypePage, error) {
+	v := url.Values{}
+	set := func(k, val string) {
+		if val != "" {
+			v.Set(k, val)
+		}
+	}
+	set("search", q.Search)
+	set("brand", q.Brand)
+	set("material", q.Material)
+	set("source", q.Source)
+	set("ids", strings.Join(q.IDs, ","))
+	set("exclude", strings.Join(q.Exclude, ","))
+	set("orderBy", q.OrderBy)
+
+	if q.Desc {
+		v.Set("desc", "true")
+	}
+
+	v.Set("offset", strconv.Itoa(max(q.Offset, 0)))
+	v.Set("limit", strconv.Itoa(min(max(q.Limit, 1), maxTypePage)))
+
+	var wire struct {
+		Items []wireFilamentType `json:"items"`
+		Total int                `json:"total"`
+	}
+
+	if err := c.do(ctx, http.MethodGet, "/filament-types/page", v, nil, &wire); err != nil {
+		return TypePage{}, err
+	}
+
+	out := TypePage{Total: wire.Total, Items: make([]FilamentType, 0, len(wire.Items))}
+	for _, w := range wire.Items {
+		out.Items = append(out.Items, w.filamentType())
+	}
+
+	return out, nil
+}
+
+// maxTypePage is the most filament types SpoolSync answers on one page.
+const maxTypePage = 200
+
+// FilamentTypesByID reads these filament types, a page of them at a time.
+func (c *Client) FilamentTypesByID(ctx context.Context, ids []string) ([]FilamentType, error) {
+	var out []FilamentType
+
+	for start := 0; start < len(ids); start += maxTypePage {
+		chunk := ids[start:min(start+maxTypePage, len(ids))]
+
+		page, err := c.FilamentTypePage(ctx, TypeQuery{IDs: chunk, Limit: maxTypePage})
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, page.Items...)
+	}
+
+	return out, nil
+}
+
+// FilamentTypeByOpt is the filament type with this OpenPrintTag material uuid,
+// or ErrNotFound.
+func (c *Client) FilamentTypeByOpt(ctx context.Context, materialUUID string) (FilamentType, error) {
+	var w wireFilamentType
+	if err := c.do(ctx, http.MethodGet, "/filament-types/by-opt/"+url.PathEscape(materialUUID), nil, nil, &w); err != nil {
+		return FilamentType{}, err
+	}
+
+	return w.filamentType(), nil
+}
+
+// FilamentKinds is every distinct material SpoolSync's types name, such as PLA.
+func (c *Client) FilamentKinds(ctx context.Context) ([]string, error) {
+	var out []string
+
+	err := c.do(ctx, http.MethodGet, "/filament-types/kinds", nil, nil, &out)
+
+	return out, err
+}
+
 // AllSpools reads every spool SpoolSync holds, spent ones included, a page at a time.
 func (c *Client) AllSpools(ctx context.Context) ([]Spool, error) {
 	var out []Spool
