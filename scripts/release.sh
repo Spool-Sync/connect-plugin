@@ -10,6 +10,9 @@
 #     into the archive's module.yaml and the binary. The host's handshake
 #     takes MAJOR.MINOR.PATCH only, so a prerelease suffix cannot be used.
 #
+# The UI bundle is built first (pnpm install --frozen-lockfile, then pnpm build
+# in ui/), and its ui/dist ships as the release's ui/. pnpm is required.
+#
 # Install it with
 #   prusa-connect module add gitlab.honex.life/spoolsync/spool-sync-prusa-connect@<version> -from dist/<archive> -approve
 set -eu
@@ -63,6 +66,20 @@ cp openapi.json "$OUT/"
 sed "s/^version: .*/version: $VERSION/" module.yaml > "$OUT/module.yaml"
 echo "$VERSION" > dist/version
 
+# The browser half, built from ui/ into ui/dist. It ships as the release's ui/,
+# so module.yaml's ui.entry (ui/index.js) is a file of the archive.
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "release: pnpm is not on the PATH, and the UI bundle needs it (corepack enable)" >&2
+  exit 1
+fi
+echo "build the UI bundle"
+(cd ui && pnpm install --frozen-lockfile && pnpm build)
+cp -R ui/dist "$OUT/ui"
+if [ ! -f "$OUT/ui/index.js" ]; then
+  echo "release: the UI build wrote no ui/index.js, the entry module.yaml names" >&2
+  exit 1
+fi
+
 for p in $PLATFORMS; do
   os=${p%_*}
   arch=${p#*_}
@@ -73,7 +90,11 @@ for p in $PLATFORMS; do
 done
 
 # checksums.txt lists every other file, so it is written last.
-(cd "$OUT" && sha256sum -- * > checksums.txt && tar -czf "../$NAME-$VERSION.tar.gz" -- *)
+# Every file under the release, the ui/ tree included, by its path from the
+# root: the installer holds each listed file to its digest and refuses an
+# unlisted one.
+(cd "$OUT" && find . -type f ! -name checksums.txt -exec sha256sum {} + \
+  | sed 's#  \./#  #' | LC_ALL=C sort -k2 > checksums.txt && tar -czf "../$NAME-$VERSION.tar.gz" -- *)
 
 sha256sum "$ARCHIVE" | cut -d' ' -f1 > "$ARCHIVE.sha256"
 echo "wrote $ARCHIVE"

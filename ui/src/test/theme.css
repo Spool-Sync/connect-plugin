@@ -1,0 +1,21 @@
+/* The theme, compiled for the tests alone.
+
+   The bundle this module ships carries no theme: the host page owns it and
+   `src/styles.css` only emits the utilities this page names. A test renders
+   the page with no host around it, so the variables those utilities read
+   would resolve to nothing and every box would be the wrong size.
+
+   This file is what a host page gives the bundle. It emits Tailwind's own
+   theme, the library's tokens, and the utilities this module's markup names,
+   so a box measured in a test is the box a person sees. */
+@import 'tailwindcss' source(none);
+@source '../';
+/* The dialog primitives' own classes, so a portalled dialog is placed as in the app. */
+@source '../../node_modules/@prusa/connect-ui/src/primitives/dialog';
+@source '../../node_modules/@prusa/connect-ui/src/primitives/alert-dialog';
+/* The table and its loading rows, so the list is the height it is in the app before and after the rows arrive. */
+@source '../../node_modules/@prusa/connect-ui/src/primitives/table';
+@source '../../node_modules/@prusa/connect-ui/src/primitives/listing-skeleton';
+/* The row-link classes, which arrive as strings from the library, not from this tree. */
+@source '../../node_modules/@prusa/connect-ui/src/primitives/row-link';
+@import '@prusa/connect-ui/tokens.css';

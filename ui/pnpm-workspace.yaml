@@ -1,0 +1,18 @@
+# This package alone. Without this file pnpm walks upwards and would join a
+# workspace it finds above the module.
+packages:
+  - .
+
+# Dependencies must have been public for 3 days before pnpm resolves them.
+minimumReleaseAge: 4320
+
+# Written versions stay exact.
+savePrefix: ''
+
+# Playwright's install script only prints a hint; the browser comes from
+# `pnpm exec playwright install chromium`, so nothing here needs a build script.
+allowBuilds: {}
+
+# A build script runs without a terminal (release.sh, CI). When node_modules
+# was made somewhere else, pnpm would otherwise ask before it purges it.
+confirmModulesPurge: false

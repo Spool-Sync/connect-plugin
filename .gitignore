@@ -1,3 +1,7 @@
 # What a build writes. It is made again from the files beside it, so it is
 # never committed.
 /dist/
+
+# The UI bundle: its packages and its build.
+/ui/node_modules/
+/ui/dist/

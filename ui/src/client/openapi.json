@@ -1,0 +1,2215 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "spool-sync-prusa-connect",
+    "version": "0.1.0",
+    "description": "The routes spool-sync-prusa-connect serves: Materials' route set, on SpoolSync. Every path is relative to the mount the host assigns. A material's uuid is its SpoolSync filament type id; a spool's id is its SpoolSync id. Both are strings, where Materials used integers."
+  },
+  "paths": {
+    "/catalogue": {
+      "get": {
+        "operationId": "read-catalogue",
+        "summary": "The catalogue and its import",
+        "description": "Whether SpoolSync holds materials from the OpenPrintTag database, and the state of the last or current import. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The catalogue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    },
+    "/catalogue/brands": {
+      "get": {
+        "operationId": "list-brands",
+        "summary": "The catalogue brands",
+        "description": "Every brand of the materials by name. Brands are kept by name in SpoolSync, so uuid and slug repeat the name. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The brands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "brands"
+                  ],
+                  "properties": {
+                    "brands": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Brand"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    },
+    "/catalogue/download": {
+      "post": {
+        "operationId": "download-catalogue",
+        "summary": "Download the catalogue",
+        "description": "Starts the OpenPrintTag import in SpoolSync and answers at once. A second call while one runs is refused with spool-sync/IMPORT_RUNNING. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "202": {
+            "description": "The import started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    },
+    "/custom-materials": {
+      "post": {
+        "operationId": "create-custom-material",
+        "summary": "Make a custom material",
+        "description": "Makes a custom filament type in SpoolSync. A material without a name, with a class other than FFF or SLA, or with a text over its bound is refused with spool-sync/MATERIAL_INVALID. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "201": {
+            "description": "The material.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomMaterial"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialFields"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/custom-materials/{uuid}": {
+      "patch": {
+        "operationId": "update-custom-material",
+        "summary": "Change a custom material",
+        "description": "Replaces every field of the custom material with the body. Spools already added keep the fields they were added with. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The material as it is now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomMaterial"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialFields"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-custom-material",
+        "summary": "Delete a custom material",
+        "description": "Deletes the custom material and its stars. One a spool in stock is of is refused with spool-sync/MATERIAL_IN_USE. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/favourites/{uuid}": {
+      "put": {
+        "operationId": "star-material",
+        "summary": "Star a material",
+        "description": "Marks a material as the caller's favourite. Starring one twice changes nothing. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Starred."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "unstar-material",
+        "summary": "Unstar a material",
+        "description": "Takes the material out of the caller's favourites. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Unstarred."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/list-filters": {
+      "get": {
+        "operationId": "get-list-filters",
+        "summary": "The kept list filters",
+        "description": "The filters the caller last gave the materials list, or an empty object. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The kept filters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "filters"
+                  ],
+                  "properties": {
+                    "filters": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      },
+      "put": {
+        "operationId": "keep-list-filters",
+        "summary": "Keep the list filters",
+        "description": "Keeps the caller's list filters in place of the last ones. Anything but a JSON object of at most 2048 bytes is refused with spool-sync/INVALID_QUERY. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Kept."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations": {
+      "get": {
+        "operationId": "list-locations",
+        "summary": "The locations",
+        "description": "Every location by name, with how many spools in stock are kept at each, archived ones left out. The module keeps at most 100. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The locations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "locations"
+                  ],
+                  "properties": {
+                    "locations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Location"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      },
+      "post": {
+        "operationId": "create-location",
+        "summary": "Make a location",
+        "description": "Makes a location, or answers the one that already has the name in any case. An empty or too long name is refused with spool-sync/LOCATION_INVALID. A new location past the 100 is refused with spool-sync/LOCATIONS_FULL. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationName"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/locations/{id}": {
+      "patch": {
+        "operationId": "rename-location",
+        "summary": "Rename a location",
+        "description": "Renames a location for every spool kept there. A name another location has in any case is refused with spool-sync/LOCATION_TAKEN. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The renamed location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationName"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-location",
+        "summary": "Delete a location",
+        "description": "Deletes a location; every spool kept there is left with none. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/materials": {
+      "get": {
+        "operationId": "list-materials",
+        "summary": "The materials",
+        "description": "The materials SpoolSync holds, with their stock. The caller's favourites come first, then the materials with filament in stock, most first, then custom ones, then the rest, unless order names a key. A material's uuid is its SpoolSync filament type id. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "class",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "favourites",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "custom",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "in_stock",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "assigned",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "brand",
+                "type",
+                "spools",
+                "weight"
+              ]
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/materials/{uuid}": {
+      "get": {
+        "operationId": "get-material",
+        "summary": "One material",
+        "description": "One material as the caller sees it in the list, with its custom fields when it is a custom one. Packages are always empty: SpoolSync holds none. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The material.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Detail"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/materials/{uuid}/spools": {
+      "get": {
+        "operationId": "list-material-spools",
+        "summary": "The spools of one material",
+        "description": "One page of the spools of one material, archived ones with them, oldest first. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "One page of the spools.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spools"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/printers": {
+      "get": {
+        "operationId": "list-printers",
+        "summary": "The printers",
+        "description": "The printers the module follows that the caller may observe, with whether the caller may operate each. Each answer is kept for 30 seconds per person, action and printer. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The printers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "printers",
+                    "total"
+                  ],
+                  "properties": {
+                    "printers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Printer"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "next": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/printers/tools": {
+      "get": {
+        "operationId": "list-printer-tools",
+        "summary": "The tools of the printers",
+        "description": "The tools of one page of the printers the caller may observe, with the material and the spool on each. An MMU head is left out: its slots hold the material. The paging counts printers; total counts the tools of every printer the caller may observe. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The tools of one page of printers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolRows"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        ]
+      }
+    },
+    "/printers/{device}/tools": {
+      "get": {
+        "operationId": "list-tools",
+        "summary": "The tools of one printer",
+        "description": "The printer and its tools, with what is on each, what the printer reports, and why an assign or an unassign would be refused. A printer the module does not follow, or one the caller may not observe, is spool-sync/NOT_FOUND. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The printer and its tools.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Printer"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "tools"
+                      ],
+                      "properties": {
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Tool"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/printers/{device}/tools/{tool}": {
+      "put": {
+        "operationId": "assign-tool",
+        "summary": "Assign a material or a spool to a tool",
+        "description": "Puts a material, or a spool and its material, on the tool in place of what was there. The rules decide whether it may: a refusal is spool-sync/TOOL_REFUSED with params.reason and params.state. A spool on another tool is spool-sync/SPOOL_ON_ANOTHER_TOOL and an archived one spool-sync/SPOOL_ARCHIVED. A printer the caller may not observe is spool-sync/NOT_FOUND, and one they observe and may not operate spool-sync/NOT_OPERATOR. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.",
+        "responses": {
+          "200": {
+            "description": "What is on the tool now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assignment"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRequest"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unassign-tool",
+        "summary": "Unassign a tool",
+        "description": "Takes the person's assignment off the tool. A tool that reports a material keeps what the printer reports. Refused with spool-sync/TOOL_REFUSED while the printer prints or is busy. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.",
+        "responses": {
+          "204": {
+            "description": "Unassigned."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/printers/{device}/tools/{tool}/spool": {
+      "post": {
+        "operationId": "add-reported-spool",
+        "summary": "Add the spool a printer read off its NFC tag",
+        "description": "Adds the spool the printer read off its NFC tag to stock, with the tag's uuid and the source printer, and puts it on the tool. A tag a spool already carries adds nothing, and an archived one comes back. A tool that reads no tag is spool-sync/NOT_REPORTED. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.",
+        "responses": {
+          "201": {
+            "description": "The spool, on the tool.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spool"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/spools": {
+      "get": {
+        "operationId": "list-spools",
+        "summary": "The spools",
+        "description": "One page of every spool SpoolSync holds, archived ones with them, oldest first, or of one material's with material. A spool on a tool names the tool. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "One page of the spools.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spools"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "material",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "add-spools",
+        "summary": "Add spools",
+        "description": "Adds quantity identical spools of a material, copying its fields. It answers the new spools' ids. An add that would pass max_spools is refused with spool-sync/SHELF_FULL. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "201": {
+            "description": "How many spools were added, and their ids.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpoolsAdded"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpoolsDraft"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spools/delete": {
+      "post": {
+        "operationId": "delete-spools",
+        "summary": "Delete spools",
+        "description": "Takes 1 to 100 spools out of stock. All or none: a spool on a printer tool refuses the whole call with spool-sync/SPOOL_ASSIGNED. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpoolIDs"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spools/{id}": {
+      "patch": {
+        "operationId": "update-spool",
+        "summary": "Change a spool",
+        "description": "Changes the fields the body carries. A spool on a printer tool takes notes and a location; a change of its weight or its archive is refused with spool-sync/SPOOL_ASSIGNED until it is unassigned. An archived spool cannot go on a tool. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The spool as it is now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spool"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpoolPatch"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-spool",
+        "summary": "Delete a spool",
+        "description": "Takes a spool out of stock. A spool on a printer tool is refused with spool-sync/SPOOL_ASSIGNED until it is unassigned. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/spools/{id}/merge": {
+      "post": {
+        "operationId": "merge-spool",
+        "summary": "Merge a manual spool into a printer spool",
+        "description": "Says that a spool added by hand and a spool a printer read off its NFC tag are one spool. The printer spool keeps its values and takes the location and the notes of the other where it has none; the manual spool leaves stock. Anything but a manual spool into a printer spool of the same material is refused with spool-sync/MERGE_REFUSED. The host takes operate_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The printer spool as it is now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Spool"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "operationId": "read-status",
+        "summary": "What the module is doing",
+        "description": "Whether the module is configured, what the follower has done since it started, and how many printers and tools with a spool it follows. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "configured"
+                  ],
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "stats": {
+                      "$ref": "#/components/schemas/Stats"
+                    },
+                    "printers": {
+                      "type": "integer"
+                    },
+                    "tools": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    },
+    "/types": {
+      "get": {
+        "operationId": "list-types",
+        "summary": "The material types",
+        "description": "Every material type of the materials by name, for the type filter. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The types.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "types"
+                  ],
+                  "properties": {
+                    "types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Refusal": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "spool-sync/ACCESS_UNKNOWN",
+              "spool-sync/IMPORT_RUNNING",
+              "spool-sync/INVALID_QUERY",
+              "spool-sync/LOCATIONS_FULL",
+              "spool-sync/LOCATION_INVALID",
+              "spool-sync/LOCATION_TAKEN",
+              "spool-sync/MATERIAL_INVALID",
+              "spool-sync/MATERIAL_IN_USE",
+              "spool-sync/MERGE_REFUSED",
+              "spool-sync/NOT_CONFIGURED",
+              "spool-sync/NOT_FOUND",
+              "spool-sync/NOT_OPERATOR",
+              "spool-sync/NOT_REPORTED",
+              "spool-sync/NO_PRINCIPAL",
+              "spool-sync/SHELF_FULL",
+              "spool-sync/SPOOL_ARCHIVED",
+              "spool-sync/SPOOL_ASSIGNED",
+              "spool-sync/SPOOL_INVALID",
+              "spool-sync/SPOOL_ON_ANOTHER_TOOL",
+              "spool-sync/SPOOLSYNC_REFUSED",
+              "spool-sync/SPOOLSYNC_UNAVAILABLE",
+              "spool-sync/STORE_FAILED",
+              "spool-sync/TOOL_REFUSED"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "status",
+          "code",
+          "title",
+          "detail",
+          "params",
+          "retryable"
+        ]
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "written": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "unknown": {
+            "type": "integer"
+          },
+          "last_write": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "last_full_read": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Catalogue": {
+        "type": "object",
+        "properties": {
+          "loaded": {
+            "type": "boolean"
+          },
+          "import": {
+            "$ref": "#/components/schemas/ImportStatus"
+          }
+        },
+        "required": [
+          "loaded",
+          "import"
+        ]
+      },
+      "ImportStatus": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "running",
+              "failed"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "started": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "imported": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "skipped": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase"
+        ]
+      },
+      "Brand": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uuid",
+          "slug",
+          "name"
+        ]
+      },
+      "Row": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "is_favourite": {
+            "type": "boolean"
+          },
+          "is_custom": {
+            "type": "boolean"
+          },
+          "spools": {
+            "type": "integer"
+          },
+          "assigned_spools": {
+            "type": "integer"
+          },
+          "remaining_weight_g": {
+            "type": "number"
+          },
+          "free_g": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "uuid",
+          "name",
+          "brand_name",
+          "class",
+          "type",
+          "color_rgba",
+          "is_favourite",
+          "is_custom",
+          "spools",
+          "assigned_spools",
+          "remaining_weight_g",
+          "free_g"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "stock_g": {
+            "type": "number"
+          },
+          "stock_spools": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "stock_g",
+          "stock_spools"
+        ]
+      },
+      "MaterialFields": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string",
+            "enum": [
+              "FFF",
+              "SLA"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "diameter_um": {
+            "type": "integer"
+          },
+          "density": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "class"
+        ]
+      },
+      "CustomMaterial": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "diameter_um": {
+            "type": "integer"
+          },
+          "density": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "uuid",
+          "name",
+          "class"
+        ]
+      },
+      "Detail": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "is_favourite": {
+            "type": "boolean"
+          },
+          "is_custom": {
+            "type": "boolean"
+          },
+          "spools": {
+            "type": "integer"
+          },
+          "assigned_spools": {
+            "type": "integer"
+          },
+          "remaining_weight_g": {
+            "type": "number"
+          },
+          "free_g": {
+            "type": "number"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "custom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomMaterial"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "packages"
+        ]
+      },
+      "Spool": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "printer"
+            ]
+          },
+          "material_uuid": {
+            "type": "string"
+          },
+          "material_source": {
+            "type": "string",
+            "enum": [
+              "catalogue",
+              "custom"
+            ]
+          },
+          "material_name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "density": {
+            "type": "number"
+          },
+          "diameter_um": {
+            "type": "integer"
+          },
+          "full_weight_g": {
+            "type": "number"
+          },
+          "empty_weight_g": {
+            "type": "number"
+          },
+          "remaining_weight_g": {
+            "type": "number"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archive_reason": {
+            "type": "string",
+            "enum": [
+              "consumed",
+              "defective",
+              "lost",
+              "expired",
+              "damaged",
+              "other"
+            ]
+          },
+          "archive_reason_note": {
+            "type": "string"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "uuid",
+          "source",
+          "material_uuid",
+          "material_source",
+          "material_name",
+          "brand_name",
+          "class",
+          "type",
+          "color_rgba",
+          "remaining_weight_g",
+          "location",
+          "notes",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "archived_at",
+          "tool"
+        ]
+      },
+      "SpoolsDraft": {
+        "type": "object",
+        "properties": {
+          "material_uuid": {
+            "type": "string"
+          },
+          "full_weight_g": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "empty_weight_g": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "remaining_weight_g": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "notes": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "location_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "material_uuid",
+          "remaining_weight_g",
+          "quantity"
+        ]
+      },
+      "SpoolPatch": {
+        "type": "object",
+        "properties": {
+          "remaining_weight_g": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100000
+          },
+          "notes": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "archive_reason": {
+            "type": "string",
+            "enum": [
+              "consumed",
+              "defective",
+              "lost",
+              "expired",
+              "damaged",
+              "other",
+              ""
+            ]
+          },
+          "archive_reason_note": {
+            "type": "string"
+          }
+        }
+      },
+      "Spools": {
+        "type": "object",
+        "properties": {
+          "spools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Spool"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "spools",
+          "total"
+        ]
+      },
+      "SpoolsAdded": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "integer"
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "added",
+          "ids"
+        ]
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "spools": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "spools"
+        ]
+      },
+      "LocationName": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "SpoolIDs": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "MergeRequest": {
+        "type": "object",
+        "properties": {
+          "into": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "into"
+        ]
+      },
+      "ToolRef": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "tool_id": {
+            "type": "string"
+          },
+          "gone": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "device_id",
+          "tool_id",
+          "gone"
+        ]
+      },
+      "Reason": {
+        "type": "string",
+        "enum": [
+          "",
+          "printing",
+          "busy",
+          "reported-loaded",
+          "reported-empty",
+          "nfc"
+        ]
+      },
+      "Printer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "may_operate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "model",
+          "connected",
+          "state",
+          "may_operate"
+        ]
+      },
+      "Assignment": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "tool_id": {
+            "type": "string"
+          },
+          "material_uuid": {
+            "type": "string"
+          },
+          "material_source": {
+            "type": "string"
+          },
+          "material_name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "spool_id": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string",
+            "enum": [
+              "person",
+              "printer"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "device_id",
+          "tool_id",
+          "material_uuid",
+          "material_source",
+          "material_name",
+          "brand_name",
+          "type",
+          "abbreviation",
+          "color_rgba",
+          "by",
+          "updated_at"
+        ]
+      },
+      "Reported": {
+        "type": "object",
+        "properties": {
+          "abbreviation": {
+            "type": "string"
+          },
+          "instance_uuid": {
+            "type": "string"
+          },
+          "package_uuid": {
+            "type": "string"
+          },
+          "material_uuid": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "full_weight_g": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "abbreviation",
+          "instance_uuid",
+          "package_uuid",
+          "material_uuid",
+          "type",
+          "color_rgba"
+        ]
+      },
+      "Nozzle": {
+        "type": "object",
+        "properties": {
+          "diameter_mm": {
+            "type": "number"
+          },
+          "high_flow": {
+            "type": "boolean"
+          },
+          "hardened": {
+            "type": "boolean"
+          },
+          "high_temp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Tool": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assignment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Assignment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reported": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reported"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "from_nfc": {
+            "type": "boolean"
+          },
+          "assign": {
+            "$ref": "#/components/schemas/Reason"
+          },
+          "unassign": {
+            "$ref": "#/components/schemas/Reason"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "head",
+              "slot"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "nozzle": {
+            "$ref": "#/components/schemas/Nozzle"
+          },
+          "feeder": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "assignment",
+          "reported",
+          "from_nfc",
+          "assign",
+          "unassign",
+          "kind",
+          "active",
+          "nozzle"
+        ]
+      },
+      "AssignRequest": {
+        "type": "object",
+        "properties": {
+          "material_uuid": {
+            "type": "string"
+          },
+          "spool_id": {
+            "type": "string"
+          }
+        }
+      },
+      "ToolRow": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "tool_id": {
+            "type": "string"
+          },
+          "material_uuid": {
+            "type": "string"
+          },
+          "material_name": {
+            "type": "string"
+          },
+          "brand_name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "color_rgba": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string",
+            "enum": [
+              "person",
+              "printer"
+            ]
+          },
+          "from_nfc": {
+            "type": "boolean"
+          },
+          "spool_id": {
+            "type": "string"
+          },
+          "spool_uuid": {
+            "type": "string"
+          },
+          "remaining_weight_g": {
+            "type": "number"
+          },
+          "full_weight_g": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "device_id",
+          "tool_id",
+          "from_nfc"
+        ]
+      },
+      "ToolRows": {
+        "type": "object",
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolRow"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tools",
+          "total"
+        ]
+      }
+    },
+    "responses": {
+      "Refused": {
+        "description": "The module refused the call. The code says which rule it met.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Refusal"
+            }
+          }
+        }
+      }
+    }
+  }
+}
