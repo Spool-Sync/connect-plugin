@@ -72,7 +72,7 @@ const shiftAt = async (width: number) => {
   await render(stub.registered.pages.materials!);
 
   await expect
-    .element(page.getByRole('status', { name: 'Reading the materials' }))
+    .element(page.getByRole('status', { name: 'Reading the inventory' }))
     .toBeInTheDocument();
   const before = measured();
 

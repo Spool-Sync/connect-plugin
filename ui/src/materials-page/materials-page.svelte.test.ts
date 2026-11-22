@@ -260,14 +260,14 @@ describe('the materials page', () => {
     const stub = started(listing([row('a')]), {
       routed: {
         [`/api/v1/modules/${NS}/list-filters`]: [
-          { status: 200, body: { filters: { in_stock: true, limit: 3 } } },
+          { status: 200, body: { filters: { favourites: true, limit: 3 } } },
           { status: 204, body: null },
         ],
       },
     });
     await draw(stub);
     await expect
-      .poll(() => lastList(stub).searchParams.get('in_stock'))
+      .poll(() => lastList(stub).searchParams.get('favourites'))
       .toBe('true');
     // Only what the page keeps comes back from the module.
     expect(lastList(stub).searchParams.has('limit')).toBe(false);
@@ -276,7 +276,7 @@ describe('the materials page', () => {
     await page.getByRole('button', { name: 'Favourites' }).click();
     await expect
       .poll(() => stub.calls.find((c) => c.method === 'PUT')?.body)
-      .toBe(JSON.stringify({ favourites: true, in_stock: true }));
+      .toBe(JSON.stringify({}));
   });
 
   it('opens on the shelf for a person who kept nothing and has spools', async () => {
@@ -286,11 +286,16 @@ describe('the materials page', () => {
     expect(lastList(stub).searchParams.get('in_stock')).toBe('true');
   });
 
-  it('opens on the catalogue for a person who kept nothing and has no spools', async () => {
-    const stub = started(listing([row('a')], { stock_g: 0, stock_spools: 0 }));
+  it('lists the inventory, never the catalogue, even with nothing in stock', async () => {
+    const stub = started(listing([], { stock_g: 0, stock_spools: 0 }));
     await draw(stub);
-    await expect.element(page.getByText('PLA a')).toBeInTheDocument();
-    await expect.poll(() => lastList(stub).search).toBe('');
+    await expect.element(page.getByText('No spools yet')).toBeInTheDocument();
+    expect(
+      stub.calls
+        .filter((c) => c.url.includes('/materials?') || c.url.endsWith('/materials'))
+        .every((c) => new URL(c.url, 'http://x').searchParams.get('in_stock') === 'true'),
+    ).toBe(true);
+    expect(page.getByRole('button', { name: 'In stock' }).query()).toBeNull();
   });
 
   it('makes a custom material from Custom material and reads the list again', async () => {
@@ -415,7 +420,7 @@ describe('the materials page', () => {
       .toBe('true');
 
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect.poll(() => lastList(stub).search).toBe('');
+    await expect.poll(() => lastList(stub).search).toBe('?in_stock=true');
     expect(page.getByRole('button', { name: 'Clear filters' }).query()).toBe(
       null,
     );
@@ -458,7 +463,7 @@ describe('the materials page', () => {
     await expect
       .element(
         page.getByText(
-          'No material matches this filter. Widen it to see more.',
+          'Nothing in stock matches this. Widen it to see more.',
         ),
       )
       .toBeInTheDocument();
@@ -493,7 +498,7 @@ describe('the materials page', () => {
     const stub = started(listing([row('a')]), { until: shut.held });
     await draw(stub);
     await expect
-      .element(page.getByRole('status', { name: 'Reading the materials' }))
+      .element(page.getByRole('status', { name: 'Reading the inventory' }))
       .toBeInTheDocument();
     shut.open();
     await expect.element(page.getByText('PLA a')).toBeInTheDocument();

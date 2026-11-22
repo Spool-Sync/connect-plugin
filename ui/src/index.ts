@@ -23,7 +23,12 @@ export default defineModule((host) => {
   // so it is held rather than threaded down.
   holdHost(host);
   const service = materialsOn(host);
-  holdList(new MaterialList(service, mayOperate(host)), host.signal);
+  // The page is the SpoolSync inventory: what is in stock, never the catalogue.
+  // The add and assign pickers keep their own lists, which search it all.
+  holdList(
+    new MaterialList(service, mayOperate(host), { in_stock: true }),
+    host.signal,
+  );
   holdCatalogue(new Catalogue(service), host.signal);
 
   // host.signal fires when the person who signed in leaves. Every request of

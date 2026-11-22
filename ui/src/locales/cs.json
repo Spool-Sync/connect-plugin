@@ -2,7 +2,7 @@
   "materials.custom.advanced": "Další vlastnosti materiálu",
   "_meta.language": "Čeština",
   "_meta.note": "Texty tohoto modulu v češtině. Klíč, který tu chybí, se vezme z en.json.",
-  "materials.page.title": "Materiály",
+  "materials.page.title": "SpoolSync",
   "materials.page.add": "Přidat materiál",
   "materials.page.custom": "Vlastní materiál",
   "materials.page.reading": "Načítám materiály",

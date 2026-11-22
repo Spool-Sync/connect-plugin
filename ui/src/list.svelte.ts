@@ -39,6 +39,8 @@ const FILTERS = [
  */
 export class MaterialList {
   readonly #service: MaterialsService;
+  /** Asked with every read and never shown as a filter, so it cannot be cleared. */
+  readonly #fixed: ListQuery;
   /** The core's answer, and undefined until it gave one. */
   #mayWrite = $state<boolean | undefined>(undefined);
   #rows = $state.raw<readonly Row[]>([]);
@@ -60,8 +62,13 @@ export class MaterialList {
   #flight:
     { kind: 'read' | 'more'; gen: number; done: Promise<void> } | undefined;
 
-  constructor(service: MaterialsService, mayOperate: Promise<boolean>) {
+  constructor(
+    service: MaterialsService,
+    mayOperate: Promise<boolean>,
+    fixed: ListQuery = {},
+  ) {
     this.#service = service;
+    this.#fixed = fixed;
     void mayOperate.then((allowed) => {
       this.#mayWrite = allowed;
     });
@@ -202,7 +209,7 @@ export class MaterialList {
     this.#gen += 1;
 
     return this.#start('read', async (query, gen) => {
-      const page = await this.#service.list(query);
+      const page = await this.#service.list({ ...query, ...this.#fixed });
       if (gen === this.#gen) this.#rows = page.rows;
       return page;
     });
@@ -231,7 +238,11 @@ export class MaterialList {
     if (offset === undefined) return Promise.resolve();
 
     return this.#start('more', async (query, gen) => {
-      const page = await this.#service.list({ ...query, offset });
+      const page = await this.#service.list({
+        ...query,
+        ...this.#fixed,
+        offset,
+      });
       if (gen === this.#gen) {
         // The default order follows live stock, so a page read later can
         // repeat a row an earlier one held. Paging stays by offset, so a row

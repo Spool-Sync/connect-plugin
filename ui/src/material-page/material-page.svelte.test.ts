@@ -282,7 +282,7 @@ describe('the material page', () => {
     await draw(stub);
     const trail = page.getByRole('navigation', { name: /breadcrumb/iu });
     await expect
-      .element(trail.getByRole('link', { name: 'Materials' }))
+      .element(trail.getByRole('link', { name: 'SpoolSync' }))
       .toHaveAttribute('href', stub.host.pageHref('materials'));
     await expect.element(trail.getByText('Galaxy Black')).toBeVisible();
   });

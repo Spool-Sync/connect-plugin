@@ -100,7 +100,7 @@ ui:
     # Materials' own, so links carry over.
     pages:
       - path: materials
-        title: Materials
+        title: SpoolSync
         icon: materials
       - path: material
         title: Material

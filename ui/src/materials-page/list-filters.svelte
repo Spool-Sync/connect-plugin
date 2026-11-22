@@ -33,7 +33,6 @@
 
   const SWITCHES = [
     { key: 'favourites', label: 'materials.filter.favourites', star: true },
-    { key: 'in_stock', label: 'materials.filter.inStock', star: false },
     { key: 'custom', label: 'materials.filter.custom', star: false },
     { key: 'assigned', label: 'materials.filter.assigned', star: false },
   ] as const;

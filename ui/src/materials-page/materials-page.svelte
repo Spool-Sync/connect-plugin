@@ -71,16 +71,8 @@
             .catch(() => ({}))
         : {};
       const wanted = { ...recalled, ...list.query };
-      // With no filter in mind and spools on the shelf, the page opens on
-      // them: the catalogue is 16 000 rows with nothing in them.
-      const shelf = fresh && Object.keys(wanted).length === 0;
-      const opening = shelf ? { in_stock: true } : wanted;
-      saved = JSON.stringify(kept(opening));
-      await list.narrow(opening);
-      if (shelf && list.stock.spools === 0) {
-        saved = JSON.stringify(kept(wanted));
-        await list.narrow({ in_stock: undefined });
-      }
+      saved = JSON.stringify(kept(wanted));
+      await list.narrow(wanted);
     })();
     let timer: ReturnType<typeof setTimeout> | undefined;
     follow(host.client, signal, ['tool'], () => {

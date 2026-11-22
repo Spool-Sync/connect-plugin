@@ -15,7 +15,6 @@ const KEPT = [
   'class',
   'favourites',
   'custom',
-  'in_stock',
   'assigned',
   'order',
   'desc',
