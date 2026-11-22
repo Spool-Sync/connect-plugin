@@ -617,10 +617,47 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		return
 	}
 
-	if rep.FullWeight == nil {
-		refuse(w, NotReported, "the printer reports no full weight for this tag", map[string]any{"device_id": device, "tool_id": tool})
+	// A tag that holds no full weight needs the person's: how much filament
+	// is left on the spool, and if they know it, how much it held new.
+	var given struct {
+		RemainingWeightG *float64 `json:"remaining_weight_g"`
+		FullWeightG      *float64 `json:"full_weight_g"`
+	}
+
+	if r.ContentLength != 0 && !decodeBody(w, r, &given) {
+		return
+	}
+
+	for _, g := range []*float64{given.RemainingWeightG, given.FullWeightG} {
+		if g != nil && (*g < 0 || *g > 100000) {
+			refuse(w, SpoolInvalid, "a weight is from 0 to 100000 grams", nil)
+
+			return
+		}
+	}
+
+	full, remaining := rep.FullWeight, given.RemainingWeightG
+	if given.FullWeightG != nil {
+		full = given.FullWeightG
+	}
+
+	if remaining == nil && full != nil {
+		left := *full
+		if e.Tool.ConsumedWeight != nil {
+			left = max(0, *full-*e.Tool.ConsumedWeight)
+		}
+
+		remaining = &left
+	}
+
+	if remaining == nil {
+		refuse(w, WeightNeeded, "", map[string]any{"device_id": device, "tool_id": tool})
 
 		return
+	}
+
+	if full == nil || *full < *remaining {
+		full = remaining
 	}
 
 	spools, err := s.spoolsAll(r.Context())
@@ -650,15 +687,9 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		return
 	}
 
-	full := *rep.FullWeight
-	remaining := full
-	if e.Tool.ConsumedWeight != nil {
-		remaining = max(0, full-*e.Tool.ConsumedWeight)
-	}
-
 	uuid := rep.InstanceUUID
 	sp, err := s.ss.Create(r.Context(), spoolsync.NewSpool{
-		FilamentTypeID: ft.ID, InitialWeightG: full + ft.SpoolWeightG, OptInstanceUUID: uuid,
+		FilamentTypeID: ft.ID, InitialWeightG: *full + ft.SpoolWeightG, OptInstanceUUID: uuid,
 	})
 	if err != nil {
 		s.spoolSyncFailed(w, "the spool", err)
@@ -666,13 +697,16 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		return
 	}
 
-	gross := remaining + ft.SpoolWeightG
+	gross := *remaining + ft.SpoolWeightG
 	if sp, err = s.ss.Update(r.Context(), sp.ID, spoolsync.SpoolUpdate{CurrentWeightG: &gross}); err != nil {
 		s.spoolSyncFailed(w, "the spool", err)
 
 		return
 	}
 
+	// The follower took the tag for one SpoolSync does not hold; from now on
+	// it counts what the printer uses off it.
+	s.fo.TagAdded(uuid)
 	s.fo.Refresh(r.Context(), device)
 	s.spoolChanged(r, sp.ID)
 

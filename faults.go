@@ -61,6 +61,8 @@ var (
 	ToolRefused = Code{Name: "spool-sync/TOOL_REFUSED", Status: http.StatusConflict, Title: "the tool cannot be changed now"}
 	// NotReported reports an NFC add on a tool that reads no tag.
 	NotReported = Code{Name: "spool-sync/NOT_REPORTED", Status: http.StatusUnprocessableEntity, Title: "the printer reports no NFC tag on this tool"}
+	// WeightNeeded reports a tag that holds no full weight added without one: the person is asked for the spool's weight.
+	WeightNeeded = Code{Name: "spool-sync/WEIGHT_NEEDED", Status: http.StatusUnprocessableEntity, Title: "the tag holds no weight; give the spool's"}
 	// MergeRefused reports a merge that is not a manual spool into a printer spool of the same material.
 	MergeRefused = Code{Name: "spool-sync/MERGE_REFUSED", Status: http.StatusConflict, Title: "these two spools cannot be merged"}
 	// SpoolAssigned reports a change to a spool that is on a printer tool, which only unassigning allows.
@@ -125,6 +127,6 @@ func refusef(w http.ResponseWriter, code Code, params map[string]any, format str
 var allCodes = []Code{
 	InvalidQuery, NotFound, MaterialInvalid, MaterialInUse, SpoolInvalid, LocationInvalid, LocationTaken,
 	LocationsFull, ShelfFull, ImportRunning, NoPrincipal, NotOperator, AccessUnknown, ToolRefused,
-	NotReported, MergeRefused, SpoolAssigned, SpoolArchived, SpoolOnAnotherTool, StoreFailed,
+	NotReported, WeightNeeded, MergeRefused, SpoolAssigned, SpoolArchived, SpoolOnAnotherTool, StoreFailed,
 	SpoolSyncUnavailable, SpoolSyncRefused, NotConfigured,
 }

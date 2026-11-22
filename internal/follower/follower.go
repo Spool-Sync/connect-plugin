@@ -610,6 +610,15 @@ func (f *Follower) bindTool(ctx context.Context, printerID string, toolID connec
 			return Binding{Source: "tag", FilamentTypeID: sp.FilamentTypeID, SpoolID: sp.ID}
 		}
 
+		if tool.ConsumedWeight != nil {
+			// The tag counts what was used off it but holds no full weight: the
+			// weight a person gave is the start, and each rise of the count after
+			// it is charged.
+			f.countConsumed(ctx, rep.InstanceUUID, *tool.ConsumedWeight, sp)
+
+			return Binding{Source: "tag", FilamentTypeID: sp.FilamentTypeID, SpoolID: sp.ID}
+		}
+
 		f.count(ctx, printerID, toolID, tool, sp)
 
 		return Binding{Source: "tag", FilamentTypeID: sp.FilamentTypeID, SpoolID: sp.ID}
@@ -646,6 +655,55 @@ func (f *Follower) bindTool(ctx context.Context, printerID string, toolID connec
 	f.count(ctx, printerID, toolID, tool, sp)
 
 	return Binding{Source: "assigned", FilamentTypeID: a.FilamentTypeID, SpoolID: sp.ID}
+}
+
+// tagCounter is the printer id a tag's consumed-weight reading is kept under.
+// The count is the tag's own, so it is kept by the tag's uuid and follows the
+// spool from printer to printer.
+const tagCounter = "tag"
+
+// countConsumed charges the rise of a tag's consumed weight since its last
+// reading to the spool. A first reading, and a lower one (the tag was written
+// again), charge nothing and become the reading counted from.
+func (f *Follower) countConsumed(ctx context.Context, uuid string, consumed float64, sp spoolsync.Spool) {
+	prev, had, err := f.store.Odometer(ctx, tagCounter, uuid)
+	if err != nil {
+		f.fail("read the count of tag "+uuid, err)
+
+		return
+	}
+
+	if had && prev.E == consumed {
+		return
+	}
+
+	if err = f.store.SetOdometer(ctx, tagCounter, uuid, store.Odometer{E: consumed}, time.Now()); err != nil {
+		f.fail("keep the count of tag "+uuid, err)
+
+		return
+	}
+
+	if !had || consumed < prev.E {
+		return
+	}
+
+	if err = f.store.AddPending(ctx, sp.ID, consumed-prev.E); err != nil {
+		f.fail("count the filament of spool "+sp.ID, err)
+
+		return
+	}
+
+	f.flushLocked(ctx, sp.ID)
+}
+
+// TagAdded forgets that SpoolSync held no spool for a tag, because one was
+// just added for it. Without it the tag would count nothing until the next
+// full read.
+func (f *Follower) TagAdded(uuid string) {
+	f.work.Lock()
+	defer f.work.Unlock()
+
+	delete(f.unknown, uuid)
 }
 
 // spoolByTag is the spool with an instance uuid. found is false for a uuid

@@ -714,3 +714,34 @@ func TestPrinterToolsSayWhetherTheCallerMayOperate(t *testing.T) {
 		t.Fatalf("a watcher may operate: %v", got["may_operate"])
 	}
 }
+
+// A tag that holds no full weight asks for the spool's weight, and takes it.
+func TestAddReportedAsksForTheWeightATagLacks(t *testing.T) {
+	const uuid = "bf63e92d-9ca5-53d7-9fab-ffdd0240c587"
+
+	r := newRig(t, printerWith("IDLE", map[string]map[string]any{"0": {
+		connectorapi.MaterialInstanceUUID: uuid,
+		connectorapi.MaterialType:         "PLA",
+		connectorapi.ConsumedWeight:       12.0,
+	}}))
+	r.access = allow{"user:alpha operate p1": true, "user:alpha observe p1": true}
+	r.svc.access = r.access
+
+	if rec := r.call(t, "POST", "/printers/p1/tools/0/spool", "", "user:alpha"); code(t, rec) != "spool-sync/WEIGHT_NEEDED" {
+		t.Fatalf("a tag with no weight answered %s", rec.Body.String())
+	}
+
+	if rec := r.call(t, "POST", "/printers/p1/tools/0/spool", `{"remaining_weight_g":-1}`, "user:alpha"); code(t, rec) != "spool-sync/SPOOL_INVALID" {
+		t.Fatalf("a negative weight answered %s", rec.Body.String())
+	}
+
+	rec := r.call(t, "POST", "/printers/p1/tools/0/spool", `{"remaining_weight_g":640}`, "user:alpha")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("with a weight it answered %d %s", rec.Code, rec.Body.String())
+	}
+
+	got := decode(t, rec)
+	if got["remaining_weight_g"] != 640.0 || got["full_weight_g"] != 640.0 || got["uuid"] != uuid {
+		t.Fatalf("the spool is %v, want 640 g left of 640 g, with the tag's uuid", got)
+	}
+}

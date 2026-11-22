@@ -687,3 +687,30 @@ func TestAMaterialAloneSitsOnTheToolAndCountsNothing(t *testing.T) {
 		t.Fatalf("a material alone is a spool placement: %+v", got)
 	}
 }
+
+// A tag that holds no full weight starts from the spool's weight and charges
+// each rise of its consumed weight after the first reading.
+func TestATagWithNoFullWeightChargesWhatItsCountRises(t *testing.T) {
+	const uuid = "bf63e92d-9ca5-53d7-9fab-ffdd0240c586"
+
+	w := newWorld(t, []spoolsync.Spool{plaSpool("s1", 1100, uuid)}, printer("p1", head("0", map[string]any{
+		connectorapi.MaterialInstanceUUID: uuid,
+		connectorapi.ConsumedWeight:       50.0,
+	})))
+
+	if got := w.ss.written(); len(got) != 0 {
+		t.Fatalf("the first reading wrote %v; it is the start", got)
+	}
+
+	w.window(t, sample(connectorapi.ToolPath("0", connectorapi.ConsumedWeight), 53.4))
+	if got := w.ss.written(); len(got) != 1 || got[0] != 1097 {
+		t.Fatalf("writes %v, want [1097] (3 whole grams of 3.4)", got)
+	}
+
+	// A tag written again counts from its new reading and charges nothing.
+	w.window(t, sample(connectorapi.ToolPath("0", connectorapi.ConsumedWeight), 0.0))
+	w.window(t, sample(connectorapi.ToolPath("0", connectorapi.ConsumedWeight), 1.0))
+	if got := w.ss.written(); len(got) != 2 || got[1] != 1096 {
+		t.Fatalf("writes %v, want [1097 1096] (0.4 pending + 1)", got)
+	}
+}
