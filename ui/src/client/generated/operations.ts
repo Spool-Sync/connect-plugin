@@ -6,7 +6,7 @@ import type { operations } from "./module-api.js";
 
 /** Every operation the document declares, keyed by its operationId. */
 export const operationTable = {
-  "add-reported-spool": { id: "add-reported-spool", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/printers/{device}/tools/{tool}/spool", response: "json", anonymous: false },
+  "add-reported-spool": { id: "add-reported-spool", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/printers/{device}/tools/{tool}/spool", body: "application/json", response: "json", anonymous: false },
   "add-spools": { id: "add-spools", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/spools", body: "application/json", response: "json", anonymous: false },
   "assign-tool": { id: "assign-tool", method: "PUT", path: "/api/v1/modules/com.github.aux.prusa3d.materials/printers/{device}/tools/{tool}", body: "application/json", response: "json", anonymous: false },
   "create-custom-material": { id: "create-custom-material", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/custom-materials", body: "application/json", response: "json", anonymous: false },
@@ -49,6 +49,7 @@ export interface Operations {
   addReportedSpool(
     request: {
       path: operations["add-reported-spool"]["parameters"]["path"];
+      body?: NonNullable<operations["add-reported-spool"]["requestBody"]>["content"]["application/json"];
     },
     signal?: AbortSignal,
   ): Promise<operations["add-reported-spool"]["responses"][201]["content"]["application/json"]>;

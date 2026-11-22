@@ -359,7 +359,7 @@ export interface paths {
         put?: never;
         /**
          * Add the spool a printer read off its NFC tag
-         * @description Adds the spool the printer read off its NFC tag to stock, with the tag's uuid and the source printer, and puts it on the tool. A tag a spool already carries adds nothing, and an archived one comes back. A tool that reads no tag is spool-sync/NOT_REPORTED. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.
+         * @description Adds the spool the printer read off its NFC tag to stock, with the tag's uuid and the source printer, and puts it on the tool. A tag a spool already carries adds nothing, and an archived one comes back. A tool that reads no tag is spool-sync/NOT_REPORTED. A tag that holds no full weight needs remaining_weight_g in the body, and without it is spool-sync/WEIGHT_NEEDED; full_weight_g, when given, is what the spool held new. Weights in the body win over the tag's. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.
          */
         post: operations["add-reported-spool"];
         delete?: never;
@@ -504,7 +504,7 @@ export interface components {
             type: string;
             status: number;
             /** @enum {string} */
-            code: "spool-sync/ACCESS_UNKNOWN" | "spool-sync/IMPORT_RUNNING" | "spool-sync/INVALID_QUERY" | "spool-sync/LOCATIONS_FULL" | "spool-sync/LOCATION_INVALID" | "spool-sync/LOCATION_TAKEN" | "spool-sync/MATERIAL_INVALID" | "spool-sync/MATERIAL_IN_USE" | "spool-sync/MERGE_REFUSED" | "spool-sync/NOT_CONFIGURED" | "spool-sync/NOT_FOUND" | "spool-sync/NOT_OPERATOR" | "spool-sync/NOT_REPORTED" | "spool-sync/NO_PRINCIPAL" | "spool-sync/SHELF_FULL" | "spool-sync/SPOOL_ARCHIVED" | "spool-sync/SPOOL_ASSIGNED" | "spool-sync/SPOOL_INVALID" | "spool-sync/SPOOL_ON_ANOTHER_TOOL" | "spool-sync/SPOOLSYNC_REFUSED" | "spool-sync/SPOOLSYNC_UNAVAILABLE" | "spool-sync/STORE_FAILED" | "spool-sync/TOOL_REFUSED";
+            code: "spool-sync/ACCESS_UNKNOWN" | "spool-sync/IMPORT_RUNNING" | "spool-sync/INVALID_QUERY" | "spool-sync/LOCATIONS_FULL" | "spool-sync/LOCATION_INVALID" | "spool-sync/LOCATION_TAKEN" | "spool-sync/MATERIAL_INVALID" | "spool-sync/MATERIAL_IN_USE" | "spool-sync/MERGE_REFUSED" | "spool-sync/NOT_CONFIGURED" | "spool-sync/NOT_FOUND" | "spool-sync/NOT_OPERATOR" | "spool-sync/NOT_REPORTED" | "spool-sync/NO_PRINCIPAL" | "spool-sync/SHELF_FULL" | "spool-sync/SPOOL_ARCHIVED" | "spool-sync/SPOOL_ASSIGNED" | "spool-sync/SPOOL_INVALID" | "spool-sync/SPOOL_ON_ANOTHER_TOOL" | "spool-sync/SPOOLSYNC_REFUSED" | "spool-sync/SPOOLSYNC_UNAVAILABLE" | "spool-sync/STORE_FAILED" | "spool-sync/TOOL_REFUSED" | "spool-sync/WEIGHT_NEEDED";
             title: string;
             detail: string;
             params: {
@@ -1328,7 +1328,16 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description The filament left on the spool, in grams. */
+                    remaining_weight_g: number;
+                    /** @description The filament the spool held new, in grams. Defaults to the tag's, else the remaining weight. */
+                    full_weight_g?: number;
+                };
+            };
+        };
         responses: {
             /** @description The spool, on the tool. */
             201: {

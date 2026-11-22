@@ -864,7 +864,7 @@
       "post": {
         "operationId": "add-reported-spool",
         "summary": "Add the spool a printer read off its NFC tag",
-        "description": "Adds the spool the printer read off its NFC tag to stock, with the tag's uuid and the source printer, and puts it on the tool. A tag a spool already carries adds nothing, and an archived one comes back. A tool that reads no tag is spool-sync/NOT_REPORTED. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.",
+        "description": "Adds the spool the printer read off its NFC tag to stock, with the tag's uuid and the source printer, and puts it on the tool. A tag a spool already carries adds nothing, and an archived one comes back. A tool that reads no tag is spool-sync/NOT_REPORTED. A tag that holds no full weight needs remaining_weight_g in the body, and without it is spool-sync/WEIGHT_NEEDED; full_weight_g, when given, is what the spool held new. Weights in the body win over the tag's. The host takes operate_resource on the module's instance before this is called, and the module asks the host with access.check whether the caller may operate the printer.",
         "responses": {
           "201": {
             "description": "The spool, on the tool.",
@@ -897,7 +897,32 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "remaining_weight_g": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000,
+                    "description": "The filament left on the spool, in grams."
+                  },
+                  "full_weight_g": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000,
+                    "description": "The filament the spool held new, in grams. Defaults to the tag's, else the remaining weight."
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/spools": {
@@ -1210,6 +1235,7 @@
               "spool-sync/NOT_FOUND",
               "spool-sync/NOT_OPERATOR",
               "spool-sync/NOT_REPORTED",
+              "spool-sync/WEIGHT_NEEDED",
               "spool-sync/NO_PRINCIPAL",
               "spool-sync/SHELF_FULL",
               "spool-sync/SPOOL_ARCHIVED",

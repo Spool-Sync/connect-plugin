@@ -23,12 +23,18 @@
   import FilamentPosition from './filament-position.svelte';
   import { onMount, untrack, type Snippet } from 'svelte';
 
-  import { materialsOn, type PrinterTools, type Tool } from '../api';
+  import {
+    materialsOn,
+    type PrinterTools,
+    type ReportedWeights,
+    type Tool,
+  } from '../api';
   import { heldHost } from '../host';
   import { heldList } from '../list.svelte';
   import FaultNote from '../materials-page/fault-note.svelte';
   import TapTooltip from '../tap-tooltip.svelte';
-  import MaterialPicker from './material-picker.svelte';
+  import AssignSpool from './assign-spool.svelte';
+  import WeighSpoolDialog from './weigh-spool-dialog.svelte';
   import MmuGroup from './mmu-group.svelte';
   import { OWN_MODULE } from '../own-module';
   import { holdPrinterMaterials } from './printer-material-state.svelte';
@@ -64,11 +70,13 @@
     | { tool: string; thrown: unknown; action: 'unassign' | 'add' | 'unload' }
     | undefined
   >(undefined);
-  /** The tool the picker dialog is open on. */
+  /** The tool the assign dialog is open on. */
   let assigning = $state.raw<Tool | undefined>(undefined);
-  /** The title of the form the picker swapped itself for. */
-  let pickerTitle = $state<string>();
   let pickerBusy = $state(false);
+  /** The tool whose NFC spool the module needs the weights of, and the refusal of the last try. */
+  let weighing = $state.raw<Tool | undefined>(undefined);
+  let weighBusy = $state(false);
+  let weighFault = $state.raw<unknown>(undefined);
 
   let materials =
     $state.raw<ReturnType<typeof holdPrinterMaterials>['state']>();
@@ -135,11 +143,51 @@
       else await unloadFilament(host, deviceId);
       await materials?.read();
     } catch (thrown) {
-      refused = { tool: tool.id, thrown, action };
+      // A tag that holds no full weight asks the person for the weights, in a
+      // dialog, rather than refusing the add.
+      if (action === 'add' && codeOf(thrown) === WEIGHT_NEEDED) {
+        weighFault = undefined;
+        weighing = tool;
+      } else {
+        refused = { tool: tool.id, thrown, action };
+      }
     } finally {
       working = undefined;
     }
   };
+
+  /** Adds the spool the tag read, with the weights the person gave. */
+  const addWeighed = async (weights: ReportedWeights): Promise<void> => {
+    const tool = weighing;
+    if (tool === undefined || weighBusy) return;
+    weighBusy = true;
+    weighFault = undefined;
+    try {
+      await service.addReported(deviceId, tool.id, weights);
+      weighing = undefined;
+      await materials?.read();
+    } catch (thrown) {
+      weighFault = thrown;
+    } finally {
+      weighBusy = false;
+    }
+  };
+
+  /** The code a refusal carries, undefined for anything else. */
+  const codeOf = (thrown: unknown): unknown =>
+    typeof thrown === 'object' && thrown !== null
+      ? (thrown as { code?: unknown }).code
+      : undefined;
+  const WEIGHT_NEEDED = 'spool-sync/WEIGHT_NEEDED';
+
+  /**
+   * The title of the assign dialog: Replace when the tool holds a spool, Load
+   * when it does not.
+   */
+  const assignTitle = (tool: Tool, label: string): string =>
+    tool.assignment?.spool_id === undefined
+      ? t('materials.assign.loadTitle', { tool: label })
+      : t('materials.assign.replaceTitle', { tool: label });
 
   /** The tools drawn: all of them, or the one a table cell asked for. */
   const shown = $derived(
@@ -206,7 +254,6 @@
       stacked
       onassign={() => {
         refused = undefined;
-        pickerTitle = undefined;
         assigning = view.tool;
       }}
       onunload={() => void change(view.tool, 'unload')}
@@ -286,6 +333,7 @@
           position={view.label}
           bare={toolId !== undefined}
           {reported}
+          dialogTitle={assignTitle(tool, view.label)}
           assignedName={view.name ?? (reported || t('materials.printer.none'))}
           note={view.name === undefined && reported
             ? t('materials.tools.reportedOnly', { material: reported })
@@ -297,12 +345,8 @@
               ? t('error.spool-sync/TOOL_REFUSED')
               : undefined)}
         >
-          {#snippet panel(
-            close: () => void,
-            setPanelTitle: (title?: string) => void,
-            setPanelBusy: (busy: boolean) => void,
-          )}
-            <MaterialPicker
+          {#snippet panel(close: () => void, setPanelBusy: (busy: boolean) => void)}
+            <AssignSpool
               {service}
               {deviceId}
               {tool}
@@ -311,7 +355,6 @@
                 void materials?.read();
                 close();
               }}
-              ontitle={setPanelTitle}
               onbusy={setPanelBusy}
             />
           {/snippet}
@@ -382,7 +425,7 @@
 {/if}
 
 {#if !compact}
-  <!-- The same picker as the header chip and the Tools table. -->
+  <!-- The same dialog as the header chip and the Tools table. -->
   <Dialog
     open={assigning !== undefined}
     onOpenChange={(next: boolean) => {
@@ -391,17 +434,16 @@
   >
     <!-- The panel is portalled, so it carries the module's name for its
          utilities. -->
-    <DialogContent data-module={OWN_MODULE} size="md" class="max-h-dialog-height overflow-y-auto">
+    <DialogContent data-module={OWN_MODULE} size="lg" class="max-h-dialog-height overflow-y-auto">
       <DialogHeader>
         <DialogTitle>
-          {pickerTitle ??
-            t('materials.printer.assignTo', {
-              tool: assigning === undefined ? '' : viewOf(assigning).label,
-            })}
+          {assigning === undefined
+            ? ''
+            : assignTitle(assigning, viewOf(assigning).label)}
         </DialogTitle>
       </DialogHeader>
       {#if assigning}
-        <MaterialPicker
+        <AssignSpool
           {service}
           {deviceId}
           tool={assigning}
@@ -410,12 +452,19 @@
             void materials?.read();
             assigning = undefined;
           }}
-          ontitle={(title?: string) => (pickerTitle = title)}
           onbusy={(busy: boolean) => (pickerBusy = busy)}
         />
       {/if}
     </DialogContent>
   </Dialog>
+
+  <WeighSpoolDialog
+    open={weighing !== undefined}
+    busy={weighBusy}
+    fault={weighFault}
+    onsubmit={(weights: ReportedWeights) => void addWeighed(weights)}
+    onclose={() => (weighing = undefined)}
+  />
 {/if}
 
 <style>

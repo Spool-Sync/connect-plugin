@@ -99,11 +99,11 @@ describe('the materials page', () => {
     await page.viewport(1280, 800);
   });
 
-  it('shows Add material to a person who may operate and hides it from one who may not', async () => {
+  it('shows Add spool to a person who may operate and hides it from one who may not', async () => {
     const yes = started(listing([row('a')]));
     await draw(yes);
     await expect
-      .element(page.getByRole('button', { name: 'Add material' }))
+      .element(page.getByRole('button', { name: 'Add spool' }))
       .toBeInTheDocument();
     await expect
       .element(page.getByText('1.5 kg in stock · 3 spools'))
@@ -117,7 +117,7 @@ describe('the materials page', () => {
       .toBeInTheDocument();
   });
 
-  it('leaves Add material and + away for a person who may not operate', async () => {
+  it('leaves Add spool and + away for a person who may not operate', async () => {
     const no = started(listing([row('a')]), { mayOperate: false });
     await draw(no);
     await expect.element(page.getByText('PLA a')).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('the materials page', () => {
         page.getByText('You can look at the materials but not change them.'),
       )
       .toBeInTheDocument();
-    expect(page.getByRole('button', { name: 'Add material' }).query()).toBe(
+    expect(page.getByRole('button', { name: 'Add spool' }).query()).toBe(
       null,
     );
     expect(
@@ -298,23 +298,11 @@ describe('the materials page', () => {
     expect(page.getByRole('button', { name: 'In stock' }).query()).toBeNull();
   });
 
-  it('makes a custom material from Custom material and reads the list again', async () => {
+  it('opens Create spool from Add spool and reads the list again', async () => {
     const stub = started(listing([row('a')]), {
       routed: {
-        [`/api/v1/modules/${NS}/custom-materials`]: [
-          {
-            status: 201,
-            body: {
-              uuid: 'c1',
-              name: 'PLA Acme',
-              brand_name: 'Acme',
-              class: 'FFF',
-              type: 'PLA',
-              abbreviation: '',
-              color_rgba: '#2762ED',
-              density: 1.24,
-            },
-          },
+        [`/api/v1/modules/${NS}/spools`]: [
+          { status: 201, body: { added: 1, ids: ['9'] } },
         ],
       },
     });
@@ -324,24 +312,20 @@ describe('the materials page', () => {
       stub.calls.filter((c) => /\/materials(\?|$)/.test(c.url)).length;
     const before = reads();
 
-    await page.getByRole('button', { name: 'Custom material' }).click();
+    await page.getByRole('button', { name: 'Add spool' }).click();
     const dialog = page.getByRole('dialog');
     await expect
-      .element(dialog.getByRole('heading', { name: 'Create custom material' }))
+      .element(dialog.getByRole('heading', { name: 'Create spool' }))
       .toBeVisible();
-    await dialog.getByRole('button', { name: 'PLA', exact: true }).click();
-    await dialog.getByLabelText('Manufacturer *').fill('Acme');
-    await dialog.getByRole('button', { name: '#2762ED' }).click();
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    await dialog.getByRole('combobox', { name: 'Manufacturer' }).fill('Prusament');
+    await page.getByRole('option', { name: 'Prusament' }).click();
+    await dialog.getByRole('combobox', { name: 'Material type' }).click();
+    await page.getByRole('option', { name: 'PLA' }).click();
+    await dialog.getByRole('button', { name: /^PLA a/ }).click();
+    await dialog.getByLabelText('Initial weight (g) *').fill('1000');
+    await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
-    const post = stub.calls.find((c) => c.url.endsWith('/custom-materials'));
-    expect(JSON.parse(post!.body!)).toMatchObject({
-      name: 'PLA Acme',
-      brand_name: 'Acme',
-      type: 'PLA',
-      color_rgba: '#2762ED',
-    });
     expect(reads()).toBeGreaterThan(before);
   });
 
@@ -372,7 +356,7 @@ describe('the materials page', () => {
     const stub = started(listing([], { stock_g: 0, stock_spools: 0 }));
     await draw(stub);
     await expect.element(page.getByText('No spools yet')).toBeInTheDocument();
-    const add = page.getByRole('button', { name: 'Add material' });
+    const add = page.getByRole('button', { name: 'Add spool' });
     await expect.poll(() => add.elements().length).toBe(2);
   });
 
@@ -382,7 +366,7 @@ describe('the materials page', () => {
     });
     await draw(stub);
     await expect.element(page.getByText('No spools yet')).toBeInTheDocument();
-    expect(page.getByRole('button', { name: 'Add material' }).query()).toBe(
+    expect(page.getByRole('button', { name: 'Add spool' }).query()).toBe(
       null,
     );
   });

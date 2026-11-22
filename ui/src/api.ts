@@ -61,6 +61,8 @@ export type PrinterPage = Awaited<
 >;
 /** How many printers one page of the printer picker reads. */
 export const PRINTER_PAGE = 50;
+/** How many spools one page of the list reads: the most the module answers. */
+const SPOOL_PAGE = 100;
 
 /** One place spools are kept, shared by everyone, and its live spools. */
 export type Location = components['schemas']['Location'];
@@ -86,6 +88,12 @@ export type Reason = components['schemas']['Reason'];
 
 /** A material or a spool to put on a tool, one of the two. */
 export type AssignRequest = components['schemas']['AssignRequest'];
+
+/** The weights a tag without one needs: what is left, and what the spool held new. */
+export interface ReportedWeights {
+  readonly remaining_weight_g: number;
+  readonly full_weight_g?: number;
+}
 
 /** What the person narrowed the list to. A field left out keeps every row. */
 export type ListQuery = NonNullable<
@@ -126,6 +134,11 @@ export interface MaterialsService {
     offset?: number,
     signal?: AbortSignal,
   ): Promise<SpoolPage>;
+  /**
+   * Every live spool SpoolSync holds, from each page of the list in turn. An
+   * archived spool is left out: the picker never offers one.
+   */
+  allSpools(signal?: AbortSignal): Promise<readonly Spool[]>;
   updateSpool(
     id: string,
     patch: SpoolPatch,
@@ -168,10 +181,15 @@ export interface MaterialsService {
   ): Promise<Assignment>;
   /** Takes the person's assignment off a tool. */
   unassign(device: string, tool: string, signal?: AbortSignal): Promise<void>;
-  /** Adds the spool the printer read off its NFC tag, and puts it on the tool. */
+  /**
+   * Adds the spool the printer read off its NFC tag, and puts it on the tool.
+   * A tag that holds no full weight needs the weights here, or the module
+   * refuses with WEIGHT_NEEDED.
+   */
   addReported(
     device: string,
     tool: string,
+    weights?: ReportedWeights,
     signal?: AbortSignal,
   ): Promise<Spool>;
   /** Folds a spool added by hand into the printer spool `into`. */
@@ -226,6 +244,25 @@ export const materialsOn = (host: ModuleHost): MaterialsService => {
         { path: { uuid }, query: offset === undefined ? {} : { offset } },
         ended(signal),
       ),
+    allSpools: async (signal) => {
+      // The list reads at most 100 spools a page, and `next` is the offset of
+      // the page after, or none on the last one.
+      const live: Spool[] = [];
+      let offset: number | undefined;
+      do {
+        const query = offset === undefined ? {} : { offset };
+        const page = await routes.listSpools(
+          { query: { ...query, limit: SPOOL_PAGE } },
+          ended(signal),
+        );
+        live.push(...page.spools.filter((spool) => spool.archived_at == null));
+        // A page that does not move on would read the same spools again.
+        const next = page.next ?? undefined;
+        offset = next !== undefined && next > (offset ?? 0) ? next : undefined;
+      } while (offset !== undefined);
+
+      return live;
+    },
     updateSpool: async (id, patch, signal) =>
       await routes.updateSpool({ path: { id }, body: patch }, ended(signal)),
     deleteSpool: async (id, signal) => {
@@ -260,8 +297,13 @@ export const materialsOn = (host: ModuleHost): MaterialsService => {
     unassign: async (device, tool, signal) => {
       await routes.unassignTool({ path: { device, tool } }, ended(signal));
     },
-    addReported: async (device, tool, signal) =>
-      await routes.addReportedSpool({ path: { device, tool } }, ended(signal)),
+    addReported: async (device, tool, weights, signal) =>
+      await routes.addReportedSpool(
+        weights === undefined
+          ? { path: { device, tool } }
+          : { path: { device, tool }, body: weights },
+        ended(signal),
+      ),
     merge: async (id, into, signal) =>
       await routes.mergeSpool({ path: { id }, body: { into } }, ended(signal)),
   };

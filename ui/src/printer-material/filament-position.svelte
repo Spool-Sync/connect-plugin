@@ -22,6 +22,7 @@
     toolId,
     position,
     reported,
+    dialogTitle,
     assignedName,
     note,
     assignedColor,
@@ -34,20 +35,19 @@
     position: string;
     bare?: boolean;
     reported: string | undefined;
+    /** The title of the dialog the panel is drawn in. */
+    dialogTitle: string;
     assignedName: string;
     note: string | undefined;
     assignedColor: string | undefined;
     remainingGrams: number | undefined;
     disabledReason: string | undefined;
-    panel: Snippet<
-      [close: () => void, setTitle: (title?: string) => void, setBusy: (busy: boolean) => void]
-    >;
+    panel: Snippet<[close: () => void, setBusy: (busy: boolean) => void]>;
   } = $props();
 
   const t = heldHost().t;
 
   let open = $state(false);
-  let title = $state<string | undefined>(undefined);
   let busy = $state(false);
   const close = () => (open = false);
 </script>
@@ -92,8 +92,8 @@
 <Dialog bind:open>
   <DialogContent data-module={OWN_MODULE} size="lg">
     <DialogHeader>
-      <DialogTitle>{title ?? position}</DialogTitle>
+      <DialogTitle>{dialogTitle}</DialogTitle>
     </DialogHeader>
-    {@render panel(close, (next) => (title = next), (next) => (busy = next))}
+    {@render panel(close, (next) => (busy = next))}
   </DialogContent>
 </Dialog>

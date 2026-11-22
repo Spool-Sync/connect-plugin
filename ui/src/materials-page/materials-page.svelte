@@ -28,7 +28,7 @@
   import { onMount } from 'svelte';
 
   import AddDialog from '../add-dialog/add-dialog.svelte';
-  import CustomDialog from './custom-dialog.svelte';
+  import CreateSpoolDialog from '../create-spool/create-spool-dialog.svelte';
   import { materialsOn } from '../api';
   import { heldHost } from '../host';
   import { follow } from '../live';
@@ -43,13 +43,10 @@
   const host = heldHost();
   const t = host.t;
 
-  /**
-   * The add dialog, open: on a row's material, or with none for Add material,
-   * which starts by choosing one.
-   */
-  /** Set by + Custom material: the Create custom material dialog is open. */
-  let creatingCustom = $state(false);
+  /** The add dialog, open on a row's material, from the row's + . */
   let adding = $state<{ material?: string | undefined } | undefined>(undefined);
+  /** The Create spool dialog, from the header and the empty state. */
+  let creatingSpool = $state(false);
 
   const narrowed = $derived(Object.keys(list.query).length > 0);
 
@@ -107,25 +104,14 @@
         {@const hold = !list.mayWrite}
         <Button
           size="md"
-          variant="secondary"
           class={hold ? 'invisible' : undefined}
           aria-hidden={hold ? 'true' : undefined}
           tabindex={hold ? -1 : undefined}
           disabled={hold}
-          onclick={() => (creatingCustom = true)}
+          onclick={() => (creatingSpool = true)}
         >
           <PlusIcon aria-hidden="true" />
-          {t('materials.page.custom')}
-        </Button>
-        <Button
-          size="md"
-          class={hold ? 'invisible' : undefined}
-          aria-hidden={hold ? 'true' : undefined}
-          tabindex={hold ? -1 : undefined}
-          disabled={hold}
-          onclick={() => (adding = {})}
-        >
-          {t('materials.page.add')}
+          {t('materials.page.addSpool')}
         </Button>
       {/if}
     {/snippet}
@@ -171,8 +157,8 @@
             >
               {#snippet action()}
                 {#if list.mayWrite}
-                  <Button size="sm" onclick={() => (adding = {})}>
-                    {t('materials.page.add')}
+                  <Button size="sm" onclick={() => (creatingSpool = true)}>
+                    {t('materials.page.addSpool')}
                   </Button>
                 {/if}
               {/snippet}
@@ -224,8 +210,8 @@
   onadded={() => void list.read()}
 />
 
-<CustomDialog
-  open={creatingCustom}
-  onclose={() => (creatingCustom = false)}
+<CreateSpoolDialog
+  open={creatingSpool}
+  onclose={() => (creatingSpool = false)}
   oncreated={() => void list.read()}
 />
