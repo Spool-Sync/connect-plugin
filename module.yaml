@@ -48,7 +48,11 @@ options:
   - key: spoolsync_token
     type: secret
     required: true
-    summary: A SpoolSync API token (ss_...) with spools:view, spools:edit, spools:create and filament_types:view.
+    summary: A SpoolSync API token (ss_...) with every spools, filament_types and storage permission (view, create, edit, delete).
+  - key: max_spools
+    type: int
+    default: "2000"
+    summary: How many spools the module lets SpoolSync hold before it refuses to add another.
 
 require:
   core-device.list: "*"
@@ -76,29 +80,41 @@ permissions:
 checks:
   - operate
 
+# What other modules are told, on the host's event stream: a tool whose
+# material or spool changed, and a spool that changed. The payloads are the
+# Materials extension's, under this module's namespace.
+events:
+  tool: tool
+  spool: spool
+
 ui:
   # The built bundle's entry, relative to the bundle root.
   entry: ui/index.js
   # The range of @prusa/connect-ui this bundle was built against.
   library: ">=0.1.0-beta.1 <1.0.0"
+  exports:
+    - name: printer-positions
   contributes:
     # The whole of what this bundle may register. Each entry has one
-    # host.register call behind it in ui/src/index.ts.
+    # host.register call behind it in ui/src/index.ts. The paths and ids are
+    # Materials' own, so links carry over.
     pages:
-      - path: spools
-        title: Spools
-        icon: spool
-      - path: spool
-        title: Spool
+      - path: materials
+        title: Materials
+        icon: materials
+      - path: material
+        title: Material
         hidden: true
-      - path: catalogue
+    settings:
+      - id: catalogue
         title: Catalogue
-        icon: swatch-book
-    # A printer's Spools tab: the spool on each tool or MMU slot, with
-    # Assign, Change and Unassign for a tool that reads no tag.
+      - id: locations
+        title: Locations
+    # The Tools tab of the printer page: what is on each tool or MMU slot,
+    # with Assign, Change, Unload and Unassign.
     device_tab:
       - id: tools
-        title: Spools
+        title: Tools
 
 # The memory in MiB the server may budget for the process, children included.
 # needs:

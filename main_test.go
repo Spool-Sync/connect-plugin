@@ -5,17 +5,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/prusa3d/prusa-connect/sdk/manifest"
+	"github.com/prusa3d/prusa-connect/sdk/routesapi"
 	"gopkg.in/yaml.v3"
 )
 
 // TestStatusBeforeConfigure answers that nothing is configured yet.
 func TestStatusBeforeConfigure(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	routes(&running{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/status", nil))
+	(&module{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/status", nil))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("GET /status answered %d, want %d", recorder.Code, http.StatusOK)
@@ -37,7 +39,7 @@ func TestStatusBeforeConfigure(t *testing.T) {
 // TestAPathThisModuleDoesNotServeIsRefusedByCode reads the code, not the sentence.
 func TestAPathThisModuleDoesNotServeIsRefusedByCode(t *testing.T) {
 	recorder := httptest.NewRecorder()
-	routes(&running{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/nothing-here", nil))
+	(&service{}).routes().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/nothing-here", nil))
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("an unserved path answered %d, want %d", recorder.Code, http.StatusNotFound)
@@ -51,33 +53,18 @@ func TestAPathThisModuleDoesNotServeIsRefusedByCode(t *testing.T) {
 		t.Fatalf("the refusal is not JSON: %v", err)
 	}
 
-	if want := RouteNotFound.Code().String(); problem.Code != want {
-		t.Fatalf("the refusal carries %q, want %q", problem.Code, want)
+	if problem.Code != NotFound.Name {
+		t.Fatalf("the refusal carries %q, want %q", problem.Code, NotFound.Name)
 	}
 }
 
-// TestTheManifestPublishesTheCodesDefault holds module.yaml and this code to one default.
-func TestTheManifestPublishesTheCodesDefault(t *testing.T) {
-	manifest, err := os.ReadFile("module.yaml")
-	if err != nil {
-		t.Fatalf("read module.yaml: %v", err)
-	}
+// TestAnUnconfiguredModuleRefusesEveryOtherRoute holds the refusal before settings arrive.
+func TestAnUnconfiguredModuleRefusesEveryOtherRoute(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	(&module{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/spools", nil))
 
-	declared := `default: "` + defaultMaterials + `"`
-	if !strings.Contains(string(manifest), declared) {
-		t.Fatalf("module.yaml does not declare %s for materials_module", declared)
-	}
-}
-
-// TestNoSettingIsReadFromTheEnvironment keeps every setting in the manifest.
-func TestNoSettingIsReadFromTheEnvironment(t *testing.T) {
-	source, err := os.ReadFile("main.go")
-	if err != nil {
-		t.Fatalf("read main.go: %v", err)
-	}
-
-	if strings.Contains(string(source), "os.Getenv") {
-		t.Fatal("main.go reads an environment variable. Declare the setting in module.yaml instead")
+	if recorder.Code != NotConfigured.Status || !strings.Contains(recorder.Body.String(), NotConfigured.Name) {
+		t.Fatalf("GET /spools answered %d %s", recorder.Code, recorder.Body.String())
 	}
 }
 
@@ -104,4 +91,137 @@ func TestTheManifestParses(t *testing.T) {
 	if string(held.Version) != version {
 		t.Fatalf("module.yaml says version %q, main.go defaults to %q", held.Version, version)
 	}
+}
+
+// TestNoSettingIsReadFromTheEnvironment keeps every setting in the manifest.
+func TestNoSettingIsReadFromTheEnvironment(t *testing.T) {
+	for _, file := range []string{"main.go", "service.go", "routes.go", "printers.go"} {
+		source, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+
+		if strings.Contains(string(source), "os.Getenv") {
+			t.Fatalf("%s reads an environment variable. Declare the setting in module.yaml instead", file)
+		}
+	}
+}
+
+// TestTheManifestDeclaresEverySettingTheCodeReads holds Settings' keys to module.yaml's options.
+func TestTheManifestDeclaresEverySettingTheCodeReads(t *testing.T) {
+	document, err := os.ReadFile("module.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var m struct {
+		Options []struct {
+			Key string `yaml:"key"`
+		} `yaml:"options"`
+	}
+
+	if err = yaml.Unmarshal(document, &m); err != nil {
+		t.Fatal(err)
+	}
+
+	var declared []string
+	for _, o := range m.Options {
+		declared = append(declared, o.Key)
+	}
+
+	for _, want := range []string{"spoolsync_url", "spoolsync_token", "max_spools"} {
+		if !slices.Contains(declared, want) {
+			t.Fatalf("module.yaml does not declare %s; it declares %v", want, declared)
+		}
+	}
+}
+
+// TestTheOpenAPIFragmentParses holds openapi.json to the SDK's own reader.
+func TestTheOpenAPIFragmentParses(t *testing.T) {
+	if _, err := routesapi.ParseFragment(openAPI); err != nil {
+		t.Fatalf("openapi.json does not parse: %v", err)
+	}
+}
+
+// TestTheOpenAPIDescribesEveryRoute holds openapi.json to the routes the module serves.
+func TestTheOpenAPIDescribesEveryRoute(t *testing.T) {
+	var doc struct {
+		Paths map[string]map[string]json.RawMessage `json:"paths"`
+	}
+
+	if err := json.Unmarshal(openAPI, &doc); err != nil {
+		t.Fatal(err)
+	}
+
+	described := map[string]bool{}
+
+	for path, ops := range doc.Paths {
+		for method := range ops {
+			described[strings.ToUpper(method)+" "+path] = true
+		}
+	}
+
+	for _, route := range served {
+		if !described[route] {
+			t.Errorf("openapi.json does not describe %s", route)
+		}
+	}
+
+	if len(described) != len(served) {
+		t.Errorf("openapi.json describes %d operations and the module serves %d", len(described), len(served))
+	}
+
+}
+
+// TestTheRefusalEnumHoldsEveryCode holds the codes in faults.go to the Refusal enum of openapi.json.
+func TestTheRefusalEnumHoldsEveryCode(t *testing.T) {
+	var doc struct {
+		Components struct {
+			Schemas struct {
+				Refusal struct {
+					Properties struct {
+						Code struct {
+							Enum []string `json:"enum"`
+						} `json:"code"`
+					} `json:"properties"`
+				} `json:"Refusal"`
+			} `json:"schemas"`
+		} `json:"components"`
+	}
+
+	if err := json.Unmarshal(openAPI, &doc); err != nil {
+		t.Fatal(err)
+	}
+
+	enum := doc.Components.Schemas.Refusal.Properties.Code.Enum
+
+	for _, c := range allCodes {
+		if !slices.Contains(enum, c.Name) {
+			t.Errorf("the Refusal enum lacks %s", c.Name)
+		}
+	}
+
+	if len(enum) != len(allCodes) {
+		t.Errorf("the Refusal enum holds %d codes and faults.go %d", len(enum), len(allCodes))
+	}
+}
+
+// served is every route the module mounts, as openapi.json names it. A route added here
+// and not in routes() is caught by the openapi test; one added to routes() and not here
+// is caught by TestEveryRouteIsListed.
+//
+//nolint:gochecknoglobals // the list of routes; read-only.
+var served = []string{
+	"GET /status",
+	"GET /catalogue", "POST /catalogue/download", "GET /catalogue/brands", "GET /types",
+	"GET /materials", "GET /materials/{uuid}", "GET /materials/{uuid}/spools",
+	"POST /custom-materials", "PATCH /custom-materials/{uuid}", "DELETE /custom-materials/{uuid}",
+	"PUT /favourites/{uuid}", "DELETE /favourites/{uuid}",
+	"GET /locations", "POST /locations", "PATCH /locations/{id}", "DELETE /locations/{id}",
+	"GET /list-filters", "PUT /list-filters",
+	"GET /spools", "POST /spools", "PATCH /spools/{id}", "DELETE /spools/{id}", "POST /spools/delete",
+	"POST /spools/{id}/merge",
+	"GET /printers", "GET /printers/tools", "GET /printers/{device}/tools",
+	"PUT /printers/{device}/tools/{tool}", "DELETE /printers/{device}/tools/{tool}",
+	"POST /printers/{device}/tools/{tool}/spool",
 }

@@ -1,27 +1,34 @@
-// Command spool-sync-prusa-connect keeps SpoolSync's spool weights in step
-// with Prusa Connect. It follows the Materials module's spool events and, for
-// every spool a printer read off its OpenPrintTag NFC tag, sets the weight of
-// the SpoolSync spool with the same instance_uuid: the filament left plus the
-// empty spool. One way only: nothing is written back to Prusa Connect.
+// Command spool-sync-prusa-connect is the SpoolSync module for Prusa Connect: a
+// process that follows every printer, keeps the weight of each spool on a tool
+// in step with what the printer reports, and serves the routes the browser
+// half draws on. SpoolSync is the only inventory; the module replaces the
+// Materials extension and keeps Materials' routes, rules and events.
 //
-// # The route
+// # The routes
 //
-//	GET /status   what the sync has done: spools pushed, unknown to SpoolSync, failures
+// Materials' route set, with the same paths, query parameters, bodies and
+// answers, mounted at /api/v1/modules/<namespace>/ and described in
+// openapi.json. faults.go lists every code a refusal carries. GET /status
+// answers what the module is doing.
 //
-// The path is relative to the mount, so a caller reaches it at
-// /api/v1/modules/<namespace>/status.
+// # Following the printers
+//
+// Once configured, the process reads every printer and the host's event stream,
+// as itself, under the observe permission module.yaml asks for. internal/follower
+// applies what each printer reports of its tools to the spool on it.
 //
 // # Settings
 //
-// module.yaml declares every setting: the SpoolSync address, its API token,
-// and the namespace of the Materials module. The host sends them on
-// plugin.configure, which (re)starts the sync loop.
+// module.yaml declares every setting: the SpoolSync address, its token, and the
+// number of spools the module lets SpoolSync hold. The host sends them on
+// plugin.configure. Nothing here reads an environment variable.
 package main
 
 import (
 	"context"
-	_ "embed"
-	"encoding/json"
+	"database/sql"
+	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -29,21 +36,26 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"sync/atomic"
 
+	// The two drivers the database may need. sdk/moduledb imports none.
+	_ "github.com/lib/pq"
+	_ "modernc.org/sqlite"
+
+	"github.com/prusa3d/prusa-connect/sdk/accessapi"
 	"github.com/prusa3d/prusa-connect/sdk/busapi"
+	"github.com/prusa3d/prusa-connect/sdk/deviceapi"
 	"github.com/prusa3d/prusa-connect/sdk/extension"
-	"github.com/prusa3d/prusa-connect/sdk/fault"
 	"github.com/prusa3d/prusa-connect/sdk/routesapi"
 	"github.com/prusa3d/prusa-connect/sdk/wire"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
+	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
 	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/syncer"
+	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
 )
 
-// What this child reports when the host asks it what it is. The name is the
-// manifest's, and the host holds the two to each other.
+// name is what this child reports when the host asks it what it is. The name is
+// the manifest's, and the host holds the two to each other.
 const name = "spool-sync-prusa-connect"
 
 // version is module.yaml's version. scripts/release.sh overwrites it with
@@ -53,9 +65,24 @@ var version = "0.1.0"
 
 var release = extension.Version(version)
 
-// defaultMaterials is the namespace of the Materials module from the official
-// release. It is the default of the materials_module setting in module.yaml.
-const defaultMaterials = "com.github.aux.prusa3d.materials"
+// defaultMaxSpools is module.yaml's default for max_spools.
+const defaultMaxSpools = 2000
+
+// openAPI is the fragment describing the routes, with every path relative to
+// the mount. The host holds it to routesapi.ParseFragment at launch.
+//
+//go:embed openapi.json
+var openAPI []byte
+
+// migrations is the schema, one directory per engine, because the operator
+// chooses the engine.
+//
+//go:embed migrations/sqlite/* migrations/postgres/*
+var migrations embed.FS
+
+// errNoDatabase refuses a start without a database grant: the module has
+// nowhere to keep its assignments, odometers and favourites.
+var errNoDatabase = errors.New("the operator granted this module no database. Approve its needs.database request")
 
 // Settings is what an operator writes under this instance's config block. The
 // host merges it over the defaults module.yaml declares and sends the result on
@@ -63,58 +90,11 @@ const defaultMaterials = "com.github.aux.prusa3d.materials"
 type Settings struct {
 	// SpoolSyncURL is the address of the SpoolSync server, without /api/v1.
 	SpoolSyncURL string `json:"spoolsync_url"`
-	// SpoolSyncToken is a SpoolSync API token (ss_...) with spools:view and spools:edit.
+	// SpoolSyncToken is a SpoolSync API token (ss_...).
 	SpoolSyncToken string `json:"spoolsync_token"`
-	// MaterialsModule is the namespace of the Materials module to follow.
-	MaterialsModule string `json:"materials_module"`
+	// MaxSpools is how many spools the module lets SpoolSync hold before it refuses another.
+	MaxSpools int `json:"max_spools"`
 }
-
-// running is the sync loop plugin.configure started, stopped by the next one
-// or by shutdown.
-type running struct {
-	mu     sync.Mutex
-	stop   context.CancelFunc
-	done   chan struct{}
-	syncer atomic.Pointer[syncer.Syncer]
-}
-
-func (r *running) replace(s *syncer.Syncer) {
-	r.halt()
-
-	ctx, stop := context.WithCancel(context.Background())
-	done := make(chan struct{})
-
-	r.mu.Lock()
-	r.stop, r.done = stop, done
-	r.mu.Unlock()
-	r.syncer.Store(s)
-
-	go func() {
-		defer close(done)
-
-		_ = s.Run(ctx)
-	}()
-}
-
-func (r *running) halt() {
-	r.mu.Lock()
-	stop, done := r.stop, r.done
-	r.stop, r.done = nil, nil
-	r.mu.Unlock()
-
-	if stop != nil {
-		stop()
-		<-done
-	}
-}
-
-// openAPI is the fragment describing the route, with every path relative to
-// the mount. The host holds it to routesapi.ParseFragment at launch and serves
-// it rebased under the namespace, which is what cmd/generate-client-sdk reads
-// to type this module's surface.
-//
-//go:embed openapi.json
-var openAPI []byte
 
 func main() {
 	if err := run(); err != nil {
@@ -143,11 +123,11 @@ func run() error {
 		return fmt.Errorf("write the handshake: %w", err)
 	}
 
-	loop := &running{}
-	defer loop.halt()
+	mod := &module{}
+	defer mod.close()
 
-	// The method set is filled after the session exists, because the sync
-	// loop calls the host's bus and routes doors on it.
+	// The method set is filled after the session exists, because the follower
+	// and the event stream call the host's doors on it.
 	serves := wirerpc.Methods{}
 
 	conn, err := wirerpc.NewConn(stdio{}, wirerpc.Options{Role: wirerpc.RoleChild, Methods: serves})
@@ -155,7 +135,7 @@ func run() error {
 		return fmt.Errorf("build the session: %w", err)
 	}
 
-	maps.Copy(serves, methods(loop, conn))
+	maps.Copy(serves, methods(mod, conn))
 
 	// The pid is here because the host's log is the only place a person sees
 	// this process. Nothing on the wire carries it.
@@ -170,7 +150,7 @@ func run() error {
 
 // methods is the lifecycle set every child answers, plus the one call that
 // carries this module's own HTTP surface.
-func methods(loop *running, conn *wirerpc.Conn) wirerpc.Methods {
+func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 	return wirerpc.Methods{
 		wirerpc.MethodInfo: func(context.Context, wirerpc.Call) (any, error) {
 			return routesapi.Describe(
@@ -183,71 +163,126 @@ func methods(loop *running, conn *wirerpc.Conn) wirerpc.Methods {
 					Serves: []wirerpc.Method{wirerpc.MethodConfigure},
 				}, openAPI)
 		},
-		// The settings the host merged from module.yaml's defaults and this
-		// instance's config block. A bad address or a missing token refuses
-		// the configure, so the operator sees it on the module's page.
-		wirerpc.MethodConfigure: wirerpc.Configure(func(_ context.Context, sent Settings) error {
-			if sent.MaterialsModule == "" {
-				sent.MaterialsModule = defaultMaterials
-			}
+		// The settings the host merged, and the database the operator granted. The
+		// database is opened and migrated here, so the module reports ready only on
+		// a schema it has applied.
+		wirerpc.MethodConfigure: wirerpc.ConfigureReporting(
+			func(ctx context.Context, sent Settings, grants wirerpc.Grants) (wirerpc.Configured, error) {
+				client, err := spoolsync.New(sent.SpoolSyncURL, sent.SpoolSyncToken, nil)
+				if err != nil {
+					return wirerpc.Configured{}, err
+				}
 
-			client, err := spoolsync.New(sent.SpoolSyncURL, sent.SpoolSyncToken, nil)
-			if err != nil {
-				return err
-			}
+				if grants.Database == nil {
+					return wirerpc.Configured{}, errNoDatabase
+				}
 
-			log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-			subscribe := func(ctx context.Context, p busapi.SubscribeParams, onWindow func(busapi.Window) error) error {
-				return busapi.Subscribe(ctx, conn, p, onWindow)
-			}
+				db, report, err := store.Open(ctx, *grants.Database, migrations)
+				if err != nil {
+					// The cause first, and the grant's String leaves the password out.
+					return wirerpc.Configured{}, fmt.Errorf("%w (the database is %s)", err, grants.Database)
+				}
 
-			loop.replace(syncer.New(sent.MaterialsModule, routesapi.NewClient(conn), subscribe, client, log))
-			fmt.Fprintf(os.Stderr, "%s follows %s and writes to %s\n", name, sent.MaterialsModule, sent.SpoolSyncURL)
+				maxSpools := sent.MaxSpools
+				if maxSpools <= 0 {
+					maxSpools = defaultMaxSpools
+				}
 
-			return nil
-		}),
+				log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+				st := store.New(db, grants.Database.Engine)
+				subscribe := func(ctx context.Context, p busapi.SubscribeParams, onWindow func(busapi.Window) error) error {
+					return busapi.Subscribe(ctx, conn, p, onWindow)
+				}
+
+				svc := newService(client, st, log, maxSpools, accessapi.NewClient(conn), busapi.NewClient(conn))
+				fo := follower.New(deviceapi.NewClient(conn), subscribe, client, st, log)
+				svc.fo = fo
+				fo.Notify(svc.emitTool, svc.emitSpoolWritten)
+
+				mod.swap(db, svc.routes(), func(ctx context.Context) { _ = fo.Run(ctx) })
+
+				fmt.Fprintf(os.Stderr, "%s keeps its data in %s at schema version %d and writes to %s\n",
+					name, grants.Database, report.Version, sent.SpoolSyncURL)
+
+				return wirerpc.Configured{Database: report.State()}, nil
+			}),
 		wirerpc.MethodShutdown: func(context.Context, wirerpc.Call) (any, error) {
 			fmt.Fprintf(os.Stderr, "%s was asked to stop\n", name)
 
-			loop.halt()
+			mod.close()
 
 			return nil, nil
 		},
-		routesapi.MethodServe: routesapi.Serve(routes(loop)),
+		routesapi.MethodServe: routesapi.Serve(mod),
 	}
 }
 
-// routes is the surface this module serves. The paths carry no prefix.
-func routes(loop *running) http.Handler {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("GET /status", func(w http.ResponseWriter, _ *http.Request) {
-		s := loop.syncer.Load()
-		if s == nil {
-			answer(w, http.StatusOK, map[string]any{"configured": false})
-
-			return
-		}
-
-		answer(w, http.StatusOK, map[string]any{"configured": true, "stats": s.Stats()})
-	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		refuse(w, r, RouteNotFound.
-			New("this module serves no route at "+r.URL.Path).
-			With(fault.StringParam("path", r.URL.Path)))
-	})
-
-	return mux
+// module is the database, the routes and the follower plugin.configure opened.
+// A second configure replaces them: the follower still at work is stopped, and
+// waited for, before its database is closed.
+type module struct {
+	mu     sync.Mutex
+	db     *sql.DB
+	served http.Handler
+	// stop stops the follower and waits for it to end.
+	stop func()
 }
 
-// answer writes one JSON body, which is every route above.
-func answer(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
+// swap installs the next database, routes and follower in place of the last.
+func (m *module) swap(db *sql.DB, served http.Handler, run func(context.Context)) {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 
-	_ = json.NewEncoder(w).Encode(body)
+	go func() {
+		defer close(done)
+
+		run(ctx)
+	}()
+
+	next := func() { cancel(); <-done }
+
+	m.mu.Lock()
+	oldDB, oldStop := m.db, m.stop
+	m.db, m.served, m.stop = db, served, next
+	m.mu.Unlock()
+
+	if oldStop != nil {
+		oldStop()
+	}
+
+	if oldDB != nil {
+		_ = oldDB.Close()
+	}
 }
+
+// close stops the follower and closes the database. It is safe to call twice.
+func (m *module) close() { m.swap(nil, nil, func(context.Context) {}) }
+
+// ServeHTTP hands the request to the routes on the open database. The host
+// configures before the first request, so none arrives before them.
+func (m *module) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	served := m.served
+	m.mu.Unlock()
+
+	if served == nil {
+		served = unconfigured
+	}
+
+	served.ServeHTTP(w, r)
+}
+
+// unconfigured answers the module before its settings arrive: its status says so,
+// and every other route is refused until then.
+var unconfigured = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet && r.URL.Path == "/status" {
+		answer(w, http.StatusOK, map[string]any{"configured": false})
+
+		return
+	}
+
+	refuse(w, NotConfigured, "", nil)
+})
 
 // stdio is the pair the host handed over. Close shuts the reading half, which
 // is what ends a session whose host has gone quiet.

@@ -1,63 +1,96 @@
 # SpoolSync for Prusa Connect
 
-A Prusa Connect module that keeps [SpoolSync](https://spool-sync.com/) in step
-with what Prusa printers report about their NFC-tagged spools.
+A Prusa Connect module that replaces the Materials extension. SpoolSync is the
+only inventory: materials are SpoolSync filament types, spools are SpoolSync
+spools, locations are SpoolSync storage locations. The module follows every
+printer directly, works out which spool is on each tool, and keeps its weight
+in SpoolSync in step with what the printer reports.
 
-It follows the Materials module. When a printer reads an OpenPrintTag spool,
-Materials holds that spool under the tag's `instance_uuid` and counts its
-filament down as it prints. This module sets the weight of the SpoolSync spool
-with the same `instance_uuid`.
+It serves Materials' route set with the same paths, query parameters, bodies and
+refusal rules, and emits Materials' `tool` and `spool` events under its own
+namespace. The browser half (`ui/`) draws the same pages.
 
-It is one way: nothing is written back to Prusa Connect.
+## What it does
 
-## What it needs
-
-- **Materials** installed in Prusa Connect. The module calls it and reads its
-  spool events; the operator approves both at install.
-- **SpoolSync** with the `optInstanceUuid` field and the
-  `GET /api/v1/spools/by-opt/:uuid` route (branch `feat/opt-instance-uuid`).
-  SpoolSync fills the field for every spool it holds a chip UID for, so
-  existing spools need no re-scan.
-- A SpoolSync **API token** (`ss_...`) with `spools:view` and `spools:edit`.
+- **Follows the printers** through the host (`observe`): each tool's material,
+  its NFC tag, its odometer and its consumed weight.
+- **Works out the spool on each tool.** Tagged: the spool with the tag's
+  instance uuid, filament left = full weight − consumed weight. Assigned: a spool
+  a person put on the tool, counted down from the odometer by density and
+  diameter. A tool may also carry a material with no spool. A tag on a tool
+  clears its assignment.
+- **Writes SpoolSync at most once per whole gram**, as the gross weight: filament
+  left plus the empty spool. Grams counted from an odometer wait in the module's
+  database until a whole gram is due, and at the end of a job.
+- **Assigns and unassigns** through the Materials rules: a printing printer
+  refuses a change, a tool that reads a tag refuses an assignment, an empty tool
+  refuses one, an offline printer accepts. A person must be allowed to `operate`
+  the printer (`access.check`, kept 30 seconds).
+- **Archives** spools (leave the stock totals, cannot go on a tool) and keeps
+  favourites and list filters per person in its own database.
+- **Catalogue** is SpoolSync's OpenPrintTag import, started from the module.
 
 ## Settings
 
-| key | type | what it does |
-| --- | --- | --- |
-| `spoolsync_url` | url, required | The SpoolSync server, such as `https://spools.example.net`, without `/api/v1`. |
-| `spoolsync_token` | secret, required | The API token sent as `Authorization: Bearer`. |
-| `materials_module` | string | The Materials namespace to follow. Default `com.github.aux.prusa3d.materials`. |
+| key | type | default | what it controls |
+| --- | --- | --- | --- |
+| `spoolsync_url` | url, required | | The SpoolSync server, without `/api/v1`. |
+| `spoolsync_token` | secret, required | | The API token sent as `Authorization: Bearer`. |
+| `max_spools` | int | `2000` | How many spools the module lets SpoolSync hold before it refuses to add another. |
 
-## How a weight is worked out
+The module needs a database (`needs.database`): SQLite in the module's data
+directory, or Postgres if the operator picks it at install. It holds the
+assignments, the last odometer reading of each tool, the grams not yet written,
+favourites and list filters.
 
-Materials counts the filament alone. SpoolSync's `currentWeight_g` is what a
-scale reads: filament and empty spool. So the module sends
-`remaining_weight_g + filamentType.spoolWeight_g`, rounded to 0.1 g, and only
-when it differs from SpoolSync's by half a gram or more. The weight history in
-SpoolSync records these readings with the source `prusa-connect`.
+## Token permissions
 
-A spool added by hand in Materials has a UUID of Materials' own, which no tag
-carries, so it is skipped. A tagged spool SpoolSync does not hold is counted as
-`unknown` in `GET /status` and asked about again at the next full read.
+The SpoolSync token needs every one of these:
+
+`spools:view`, `spools:create`, `spools:edit`, `spools:delete`,
+`filament_types:view`, `filament_types:create`, `filament_types:edit`,
+`filament_types:delete`, `storage:view`, `storage:create`, `storage:edit`,
+`storage:delete`.
+
+Creating a token with fewer makes the matching routes answer
+`spool-sync/SPOOLSYNC_REFUSED`.
 
 ## Routes
 
-| route | what it answers |
-| --- | --- |
-| `GET /status` | `configured`, and `stats`: `pushed`, `unknown`, `failed`, `last_push`, `last_error`, `last_full_sync` |
+Materials' route set, mounted at `/api/v1/modules/<namespace>/`. `openapi.json`
+describes each one, its permission and its refusals. `GET /status` reports what
+the follower has done: the stats, the printers followed and the tools holding a
+spool. Errors are problem+json with a `spool-sync/` code; `faults.go` lists them,
+and a test holds them to the `Refusal` enum of `openapi.json`.
+
+Two differences from Materials are on purpose: spool and location ids are
+SpoolSync's strings, not integers, and a material's uuid is its SpoolSync
+filament type id.
+
+## Events
+
+Declared under `events:` in `module.yaml`, with Materials' payloads:
+
+| type | key | payload |
+| --- | --- | --- |
+| `<namespace>.tool` | `<device_id>/<tool_id>` | `device_id`, `tool_id`, `material_uuid`, `spool_id` |
+| `<namespace>.spool` | `spool/<id>` | `spool_id`, `spool_uuid`, `material_uuid`, `remaining_weight_g`, `deleted` |
+
+A spool is told once per whole gram it loses while printing. An extension that
+read Materials must point at this namespace.
 
 ## Develop
 
 ```sh
 go test -race ./...
+SPOOLSYNC_TEST_POSTGRES_DSN='postgres://user:pass@localhost/postgres?sslmode=disable' go test ./...
 ```
+
+The store tests run on SQLite always and on Postgres when the variable names a
+server; the test creates and drops its own database on it.
 
 It builds against `github.com/prusa3d/prusa-connect/sdk` at the version in
-`go.mod`. To build against a local checkout instead:
-
-```sh
-go mod edit -replace github.com/prusa3d/prusa-connect/sdk=../prusa-connect/sdk
-```
+`go.mod`.
 
 ## Release and install
 
@@ -99,7 +132,12 @@ curl -fsS https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
 
 ## Known limits
 
-- One way only.
-- A printer that SpoolSync also polls (PrusaLink) gets its weight from both:
-  SpoolSync subtracts at the end of a job, and this module sets the absolute
-  weight Materials counted. The later write wins.
+- SpoolSync has no owner on a custom material or a spool, so custom materials
+  are shared, where Materials kept them per person. Favourites and list filters
+  are per person.
+- A material has no packages and no temperatures: SpoolSync holds none.
+- Merging does not move a spool's weight history.
+- `POST /spools/delete` checks every spool first, but SpoolSync has no
+  transaction, so a failure part way leaves the earlier deletes done.
+- A printer that SpoolSync also polls over PrusaLink gets its weight from both;
+  the later write wins.
