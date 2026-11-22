@@ -745,3 +745,33 @@ func TestAddReportedAsksForTheWeightATagLacks(t *testing.T) {
 		t.Fatalf("the spool is %v, want 640 g left of 640 g, with the tag's uuid", got)
 	}
 }
+
+// A tag with no weighed full weight takes the catalogue package's nominal one,
+// less what the tag says was used, and asks for nothing.
+func TestAddReportedFallsBackToTheCataloguesNominalWeight(t *testing.T) {
+	const uuid = "bf63e92d-9ca5-53d7-9fab-ffdd0240c588"
+
+	r := newRig(t, printerWith("IDLE", map[string]map[string]any{"0": {
+		connectorapi.MaterialInstanceUUID: uuid,
+		connectorapi.MaterialUUID:         "opt-pla",
+		connectorapi.MaterialType:         "PLA",
+		connectorapi.ConsumedWeight:       12.0,
+	}}))
+	r.access = allow{"user:alpha operate p1": true, "user:alpha observe p1": true}
+	r.svc.access = r.access
+	r.ss.types["ft1"]["netWeight_g"] = 1000.0
+	before := len(r.ss.types)
+
+	rec := r.call(t, "POST", "/printers/p1/tools/0/spool", "", "user:alpha")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("answered %d %s", rec.Code, rec.Body.String())
+	}
+
+	if got := decode(t, rec); got["remaining_weight_g"] != 988.0 || got["material_uuid"] != "ft1" {
+		t.Fatalf("the spool is %v, want 988 g of ft1", got)
+	}
+
+	if len(r.ss.types) != before {
+		t.Fatal("a custom material was made for a tag the catalogue knows")
+	}
+}

@@ -617,8 +617,39 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		return
 	}
 
-	// A tag that holds no full weight needs the person's: how much filament
-	// is left on the spool, and if they know it, how much it held new.
+	spools, err := s.spoolsAll(r.Context())
+	if err != nil {
+		s.spoolSyncFailed(w, "the spools", err)
+
+		return
+	}
+
+	if liveCount(spools)+1 > s.maxSpools {
+		refuse(w, ShelfFull, "", map[string]any{"max": s.maxSpools})
+
+		return
+	}
+
+	// The catalogue's material for the tag, when it holds one. A custom one is
+	// made only once the weight is settled, so a refusal for want of a weight
+	// leaves nothing behind.
+	var ft spoolsync.FilamentType
+
+	known := false
+
+	if rep.MaterialUUID != "" {
+		switch ft, err = s.ss.FilamentTypeByOpt(r.Context(), rep.MaterialUUID); {
+		case err == nil:
+			known = true
+		case !errors.Is(err, spoolsync.ErrNotFound):
+			s.spoolSyncFailed(w, "the material", err)
+
+			return
+		}
+	}
+
+	// A spool whose full weight nobody knows needs the person's: how much
+	// filament is left on it, and if they know it, how much it held new.
 	var given struct {
 		RemainingWeightG *float64 `json:"remaining_weight_g"`
 		FullWeightG      *float64 `json:"full_weight_g"`
@@ -636,9 +667,16 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		}
 	}
 
+	// The full weight is the person's, else the tag's weighed one, else the
+	// nominal weight of the catalogue's package for the material. What the
+	// tag says was used comes off it.
 	full, remaining := rep.FullWeight, given.RemainingWeightG
 	if given.FullWeightG != nil {
 		full = given.FullWeightG
+	}
+
+	if full == nil && known {
+		full = ft.NetWeightG
 	}
 
 	if remaining == nil && full != nil {
@@ -660,31 +698,17 @@ func (s *service) addReportedSpool(w http.ResponseWriter, r *http.Request, by st
 		full = remaining
 	}
 
-	spools, err := s.spoolsAll(r.Context())
-	if err != nil {
-		s.spoolSyncFailed(w, "the spools", err)
+	if !known {
+		ftID, err := s.materialForTag(r, rep)
+		if err == nil {
+			ft, err = s.ss.FilamentType(r.Context(), ftID)
+		}
 
-		return
-	}
+		if err != nil {
+			s.spoolSyncFailed(w, "the material", err)
 
-	if liveCount(spools)+1 > s.maxSpools {
-		refuse(w, ShelfFull, "", map[string]any{"max": s.maxSpools})
-
-		return
-	}
-
-	ftID, err := s.materialForTag(r, rep)
-	if err != nil {
-		s.spoolSyncFailed(w, "the material", err)
-
-		return
-	}
-
-	ft, err := s.ss.FilamentType(r.Context(), ftID)
-	if err != nil {
-		s.spoolSyncFailed(w, "the material", err)
-
-		return
+			return
+		}
 	}
 
 	uuid := rep.InstanceUUID

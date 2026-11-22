@@ -99,7 +99,8 @@ type FilamentType struct {
 	DensityG *float64 `json:"density_g_cm3"`
 	// SpoolWeightG is the weight of the empty spool.
 	SpoolWeightG float64 `json:"spool_weight_g"`
-	// NetWeightG is always null: SpoolSync holds no net weight per type.
+	// NetWeightG is the filament a new spool of the type holds: the
+	// OpenPrintTag package's nominal weight, null when SpoolSync knows none.
 	NetWeightG *float64 `json:"net_weight_g"`
 	// OptMaterialUUID is the OpenPrintTag material uuid, null for a custom one.
 	OptMaterialUUID *string `json:"opt_material_uuid"`
@@ -684,6 +685,7 @@ type wireFilamentType struct {
 	DiameterMM        float64  `json:"diameter_mm"`
 	DensityG          *float64 `json:"density_g_cm3"`
 	SpoolWeightG      float64  `json:"spoolWeight_g"`
+	NetWeightG        *float64 `json:"netWeight_g"`
 	OptMaterialUUID   *string  `json:"optMaterialUuid"`
 	Custom            bool     `json:"custom"`
 	ReorderThresholdG *float64 `json:"reorderThreshold_g"`
@@ -693,7 +695,7 @@ type wireFilamentType struct {
 func (w wireFilamentType) filamentType() FilamentType {
 	return FilamentType{
 		ID: w.ID, Brand: w.Brand, Material: w.Material, Name: w.Name, Color: w.ColorHex,
-		DiameterMM: w.DiameterMM, DensityG: w.DensityG, SpoolWeightG: w.SpoolWeightG,
+		DiameterMM: w.DiameterMM, DensityG: w.DensityG, SpoolWeightG: w.SpoolWeightG, NetWeightG: w.NetWeightG,
 		OptMaterialUUID: w.OptMaterialUUID, Custom: w.Custom, ReorderThresholdG: w.ReorderThresholdG, Notes: w.Notes,
 	}
 }
