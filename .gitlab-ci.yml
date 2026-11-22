@@ -52,7 +52,8 @@ variables:
     GOFLAGS: -mod=readonly
 
 # The golang image has no Node. The UI needs Node 26 (ui/.nvmrc) and the pnpm
-# its packageManager field pins (11.3.0), which corepack fetches. The Node
+# its packageManager field pins (11.3.0). Node 26 ships no corepack, so npm
+# installs that pnpm. The Node
 # tarball is checked against nodejs.org's SHASUMS256.txt before it is unpacked.
 .node_setup: &node_setup
   - |
@@ -62,7 +63,7 @@ variables:
     curl -fsSL "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt" \
       | grep " node-v$NODE_VERSION-linux-x64.tar.gz\$" | sha256sum -c -
     tar -xzf "node-v$NODE_VERSION-linux-x64.tar.gz" -C /usr/local --strip-components=1
-    corepack enable
+    npm install -g --no-fund --no-audit "pnpm@$(node -p "require(process.env.CI_PROJECT_DIR + '/ui/package.json').packageManager.split('@')[1]")"
     node --version
     pnpm --version
     cd "$CI_PROJECT_DIR"
