@@ -97,7 +97,16 @@ build:
   needs: [test]
   before_script: *node_setup
   script:
+    # MARKETPLACE_SIGNING_KEY_B64 is the author's RSA private key, base64 on
+    # one line so GitLab can mask it, and protected, so it reaches main and
+    # protected tags only. With it the release is signed; without it (a branch
+    # or an MR) it is built unsigned.
     - |
+      if [ -n "${MARKETPLACE_SIGNING_KEY_B64:-}" ]; then
+        export SIGNING_KEY="$(mktemp)"
+        printf '%s' "$MARKETPLACE_SIGNING_KEY_B64" | base64 -d > "$SIGNING_KEY"
+        trap 'rm -f "$SIGNING_KEY"' EXIT
+      fi
       if [ -n "${CI_COMMIT_TAG:-}" ]; then
         TAG="$CI_COMMIT_TAG" sh scripts/release.sh
       else
