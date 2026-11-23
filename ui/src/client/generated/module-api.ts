@@ -1570,6 +1570,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         configured: boolean;
+                        /** @description True when the module keeps the inventory in its own database, with no SpoolSync server. */
+                        standalone?: boolean;
                         stats?: components["schemas"]["Stats"];
                         printers?: number;
                         tools?: number;

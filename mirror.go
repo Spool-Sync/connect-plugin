@@ -29,7 +29,13 @@ func (s *service) kickMirror() {
 
 // runMirror reports the printers the follower holds to SpoolSync, with their
 // status, job and the spool in each slot, until ctx ends.
+// A standalone module keeps the inventory itself and has no server to report to.
 func (s *service) runMirror(ctx context.Context) {
+	to, ok := s.ss.(mirror)
+	if !ok {
+		return
+	}
+
 	first := time.NewTimer(mirrorFirst)
 	defer first.Stop()
 
@@ -57,7 +63,7 @@ func (s *service) runMirror(ctx context.Context) {
 			continue
 		}
 
-		results, err := s.ss.SyncPrinters(ctx, reports)
+		results, err := to.SyncPrinters(ctx, reports)
 		if err != nil {
 			s.log.Warn("could not report the printers to SpoolSync", "error", err)
 

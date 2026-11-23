@@ -86,9 +86,11 @@ func (s *service) routes() http.Handler {
 // status answers what the module is doing. It is the one route an unconfigured module answers.
 func (s *service) status(w http.ResponseWriter, _ *http.Request) {
 	printers, tools := s.fo.Counts()
+	_, onServer := s.ss.(mirror)
 
 	answer(w, http.StatusOK, map[string]any{
 		"configured": true,
+		"standalone": !onServer,
 		"stats":      s.fo.Stats(),
 		"printers":   printers,
 		"tools":      tools,

@@ -43,16 +43,16 @@ platforms:
 options:
   - key: spoolsync_url
     type: url
-    required: true
-    summary: The address of the SpoolSync server, such as https://spools.example.net, without /api/v1.
+    required: false
+    summary: The address of the SpoolSync server, such as https://spools.example.net, without /api/v1. Leave it and the token empty to run standalone, with the inventory in the module's own database.
   - key: spoolsync_token
     type: secret
-    required: true
+    required: false
     summary: A SpoolSync API token (ss_...) with every spools, filament_types and storage permission (view, create, edit, delete), and printers view and edit. SpoolSync's "Prusa Connect" token preset has them.
   - key: max_spools
     type: int
     default: "2000"
-    summary: How many spools the module lets SpoolSync hold before it refuses to add another.
+    summary: How many spools the module lets the inventory hold before it refuses to add another.
 
 require:
   core-device.list: "*"

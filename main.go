@@ -34,6 +34,7 @@ import (
 	"maps"
 	"net/http"
 	"os"
+	"strings"
 	"os/signal"
 	"sync"
 
@@ -50,6 +51,7 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
 	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
+	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/local"
 	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
 	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
 )
@@ -80,6 +82,14 @@ var openAPI []byte
 //go:embed migrations/sqlite/* migrations/postgres/*
 var migrations embed.FS
 
+// errHalfSpoolSync refuses a SpoolSync address without a token, or a token without one.
+var errHalfSpoolSync = errors.New("spoolsync_url and spoolsync_token go together: set both to use SpoolSync, or neither to run standalone")
+
+// standalone is whether the settings name no SpoolSync server.
+func (s Settings) standalone() bool {
+	return strings.TrimSpace(s.SpoolSyncURL) == "" && strings.TrimSpace(s.SpoolSyncToken) == ""
+}
+
 // errNoDatabase refuses a start without a database grant: the module has
 // nowhere to keep its assignments, odometers and favourites.
 var errNoDatabase = errors.New("the operator granted this module no database. Approve its needs.database request")
@@ -89,6 +99,8 @@ var errNoDatabase = errors.New("the operator granted this module no database. Ap
 // plugin.configure. A key this struct does not carry refuses the start.
 type Settings struct {
 	// SpoolSyncURL is the address of the SpoolSync server, without /api/v1.
+	// Left empty with the token, the module runs standalone and keeps the
+	// inventory in its own database.
 	SpoolSyncURL string `json:"spoolsync_url"`
 	// SpoolSyncToken is a SpoolSync API token (ss_...).
 	SpoolSyncToken string `json:"spoolsync_token"`
@@ -168,9 +180,17 @@ func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 		// a schema it has applied.
 		wirerpc.MethodConfigure: wirerpc.ConfigureReporting(
 			func(ctx context.Context, sent Settings, grants wirerpc.Grants) (wirerpc.Configured, error) {
-				client, err := spoolsync.New(sent.SpoolSyncURL, sent.SpoolSyncToken, nil)
-				if err != nil {
-					return wirerpc.Configured{}, err
+				var client *spoolsync.Client
+
+				if !sent.standalone() {
+					if strings.TrimSpace(sent.SpoolSyncURL) == "" || strings.TrimSpace(sent.SpoolSyncToken) == "" {
+						return wirerpc.Configured{}, errHalfSpoolSync
+					}
+
+					var err error
+					if client, err = spoolsync.New(sent.SpoolSyncURL, sent.SpoolSyncToken, nil); err != nil {
+						return wirerpc.Configured{}, err
+					}
 				}
 
 				if grants.Database == nil {
@@ -194,20 +214,29 @@ func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 					return busapi.Subscribe(ctx, conn, p, onWindow)
 				}
 
-				svc := newService(client, st, log, maxSpools, accessapi.NewClient(conn), busapi.NewClient(conn))
-				fo := follower.New(deviceapi.NewClient(conn), subscribe, client, st, log)
+				// The inventory is SpoolSync's, or the module's own when it runs standalone.
+				var inv inventory = client
+
+				where := sent.SpoolSyncURL
+				if client == nil {
+					inv, where = local.New(db, grants.Database.Engine, log), "its own database"
+				}
+
+				svc := newService(inv, st, log, maxSpools, accessapi.NewClient(conn), busapi.NewClient(conn))
+				fo := follower.New(deviceapi.NewClient(conn), subscribe, inv, st, log)
 				svc.fo = fo
 				fo.Notify(svc.emitTool, svc.emitSpoolWritten)
 				fo.OnTagged(svc.linkTagged)
 
 				mod.swap(db, svc.routes(), func(ctx context.Context) {
 					go svc.runMirror(ctx)
+					go svc.firstCatalogue(ctx)
 
 					_ = fo.Run(ctx)
 				})
 
 				fmt.Fprintf(os.Stderr, "%s keeps its data in %s at schema version %d and writes to %s\n",
-					name, grants.Database, report.Version, sent.SpoolSyncURL)
+					name, grants.Database, report.Version, where)
 
 				return wirerpc.Configured{Database: report.State()}, nil
 			}),

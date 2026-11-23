@@ -49,10 +49,10 @@ type emitter interface {
 	Emit(ctx context.Context, endpoint, key string, data any) error
 }
 
-// service is what every handler reads: SpoolSync, the module's own database,
+// service is what every handler reads: the inventory, the module's own database,
 // the follower of the printers, the host's access check and the event stream.
 type service struct {
-	ss        *spoolsync.Client
+	ss        inventory
 	st        *store.Store
 	fo        *follower.Follower
 	access    accessAsker
@@ -131,9 +131,17 @@ func (s *service) storeFailed(w http.ResponseWriter, r *http.Request, err error)
 func (s *service) spoolSyncFailed(w http.ResponseWriter, what string, err error) {
 	var status *spoolsync.StatusError
 
+	_, onServer := s.ss.(mirror)
+
 	switch {
+	case errors.Is(err, spoolsync.ErrNotFound) && !onServer:
+		refuse(w, NotFound, what+" is not in the inventory", nil)
 	case errors.Is(err, spoolsync.ErrNotFound):
 		refuse(w, NotFound, what+" is not in SpoolSync", nil)
+	case !onServer && !errors.As(err, &status):
+		// A standalone module's inventory is its own database.
+		s.log.Error("the inventory failed", "what", what, "error", err)
+		refuse(w, StoreFailed, "", nil)
 	case errors.As(err, &status):
 		s.log.Warn("spoolsync refused", "what", what, "status", status.Status, "error", err)
 		refuse(w, SpoolSyncRefused, fmt.Sprintf("SpoolSync answered %d to %s", status.Status, what),
@@ -243,7 +251,7 @@ func colourRGBA(hex *string) string {
 
 // newService returns the service over SpoolSync, the database and the host's doors.
 // The follower is set by the caller, which needs the service's callbacks first.
-func newService(ss *spoolsync.Client, st *store.Store, log *slog.Logger, maxSpools int,
+func newService(ss inventory, st *store.Store, log *slog.Logger, maxSpools int,
 	access accessAsker, emit emitter,
 ) *service {
 	return &service{

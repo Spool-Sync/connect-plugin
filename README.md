@@ -6,6 +6,10 @@ spools, locations are SpoolSync storage locations. The module follows every
 printer directly, works out which spool is on each tool, and keeps its weight
 in SpoolSync in step with what the printer reports.
 
+It also runs **standalone**, with no SpoolSync server: leave `spoolsync_url`
+and `spoolsync_token` empty and the module keeps the inventory in its own
+database (see [Standalone](#standalone)).
+
 It serves Materials' route set with the same paths, query parameters, bodies and
 refusal rules, and emits Materials' `tool` and `spool` events under its own
 namespace. The browser half (`ui/`) draws the same pages.
@@ -34,14 +38,34 @@ namespace. The browser half (`ui/`) draws the same pages.
 
 | key | type | default | what it controls |
 | --- | --- | --- | --- |
-| `spoolsync_url` | url, required | | The SpoolSync server, without `/api/v1`. |
-| `spoolsync_token` | secret, required | | The API token sent as `Authorization: Bearer`. |
-| `max_spools` | int | `2000` | How many spools the module lets SpoolSync hold before it refuses to add another. |
+| `spoolsync_url` | url | | The SpoolSync server, without `/api/v1`. Empty with the token: standalone. |
+| `spoolsync_token` | secret | | The API token sent as `Authorization: Bearer`. Set both or neither. |
+| `max_spools` | int | `2000` | How many spools the module lets the inventory hold before it refuses to add another. |
 
 The module needs a database (`needs.database`): SQLite in the module's data
 directory, or Postgres if the operator picks it at install. It holds the
 assignments, the last odometer reading of each tool, the grams not yet written,
 favourites and list filters.
+
+## Standalone
+
+With no SpoolSync server set, the spools, filament types, storage locations and
+each spool's weight readings live in the module's database (tables
+`filament_types`, `locations`, `spools` and `weight_history`). The routes, the
+pages and the printer follower work as they do on SpoolSync; the weight rules
+are SpoolSync's (a weight is gross, the filament left is the gross less the
+empty spool).
+
+- **Catalogue:** the module downloads the OpenPrintTag database itself
+  (`internal/catalogue`, the same reading as SpoolSync's importer) and imports
+  it on its first start, and again from the Catalogue settings.
+- **Usage chart:** drawn from the readings the module records, so it starts
+  empty.
+- **Left out:** the SpoolSync app (its web UI, ESP32 scales and NFC weigh
+  station) and the Prusa Connect Local printer mirror.
+- Moving an inventory between standalone and SpoolSync is not built: changing
+  the settings starts the module on the other inventory, and the first one is
+  kept as it was.
 
 ## Token permissions
 

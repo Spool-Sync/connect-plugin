@@ -1154,6 +1154,10 @@
                     "configured": {
                       "type": "boolean"
                     },
+                    "standalone": {
+                      "type": "boolean",
+                      "description": "True when the module keeps the inventory in its own database, with no SpoolSync server."
+                    },
                     "stats": {
                       "$ref": "#/components/schemas/Stats"
                     },

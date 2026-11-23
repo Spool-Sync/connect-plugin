@@ -422,9 +422,17 @@ func newRig(t *testing.T, printer deviceapi.Device) *rig {
 
 	silent := slog.New(slog.NewTextHandler(io.Discard, nil))
 	st := store.New(db, wirerpc.DatabaseSQLite)
-	r.svc = newService(client, st, silent, 2000, r.access, r.events)
+
+	// A standalone rig keeps the inventory in the module's database, seeded with
+	// the fake's one filament type, and leaves the fake SpoolSync unasked.
+	var inv inventory = client
+	if standaloneRigs {
+		inv = seededLocal(t, db, silent)
+	}
+
+	r.svc = newService(inv, st, silent, 2000, r.access, r.events)
 	r.svc.fo = follower.New(r.fleet, func(context.Context, busapi.SubscribeParams, func(busapi.Window) error) error { return nil },
-		client, st, silent)
+		inv, st, silent)
 	r.svc.fo.Notify(r.svc.emitTool, r.svc.emitSpoolWritten)
 	r.svc.fo.OnTagged(r.svc.linkTagged)
 

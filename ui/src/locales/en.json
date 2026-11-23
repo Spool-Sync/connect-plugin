@@ -8,7 +8,7 @@
   "materials.page.viewer": "You can look at the materials but not change them.",
   "materials.page.more": "Show more",
   "materials.page.empty.heading": "No spools yet",
-  "materials.page.empty.description": "Nothing in SpoolSync is in stock. Add a material and its spools to see them here.",
+  "materials.page.empty.description": "Nothing is in stock. Add a material and its spools to see them here.",
   "materials.page.empty.filteredHeading": "Nothing matches",
   "materials.page.empty.filtered": "Nothing in stock matches this. Widen it to see more.",
   "materials.filter.search": "Search",
