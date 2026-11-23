@@ -159,6 +159,19 @@ type Follower struct {
 	// work held, and are nil for nobody.
 	onTool  func(printerID, toolID string)
 	onSpool func(spoolID string, remainingG float64)
+
+	// onTagged is told of each tagged spool and the material its tag names,
+	// once between two full reads, and answers whether it changed the spool.
+	// linked holds the pairs it was told of since the last full read.
+	onTagged func(ctx context.Context, spoolID, filamentTypeID, materialUUID string) bool
+	linked   map[string]bool
+}
+
+// OnTagged sets who is told of a tagged spool and the OpenPrintTag material
+// its tag names, so a spool on a stand-in material can be moved to the real
+// one. It answers whether it changed the spool. Call it before Run.
+func (f *Follower) OnTagged(fn func(ctx context.Context, spoolID, filamentTypeID, materialUUID string) bool) {
+	f.onTagged = fn
 }
 
 // Notify sets who is told of a tool whose binding changed, and of a spool whose
@@ -175,6 +188,7 @@ func New(devices Devices, subscribe Subscribe, ss SpoolSync, st *store.Store, lo
 		spools:   map[string]spoolsync.Spool{},
 		byTag:    map[string]string{},
 		unknown:  map[string]bool{},
+		linked:   map[string]bool{},
 		printers: map[string]deviceapi.Device{},
 		bindings: map[string]map[connectorapi.ToolID]Binding{},
 	}
@@ -289,6 +303,7 @@ func (f *Follower) reloadLocked(ctx context.Context) error {
 	clear(f.spools)
 	clear(f.byTag)
 	clear(f.unknown)
+	clear(f.linked)
 
 	for _, id := range slices.Sorted(maps.Keys(listed)) {
 		f.applyLocked(ctx, id)
@@ -595,6 +610,17 @@ func (f *Follower) bindTool(ctx context.Context, printerID string, toolID connec
 
 		if !found {
 			return Binding{Source: "tag", UnknownTag: true}
+		}
+
+		if f.onTagged != nil && rep.MaterialUUID != "" && !f.linked[sp.ID+"/"+rep.MaterialUUID] {
+			f.linked[sp.ID+"/"+rep.MaterialUUID] = true
+
+			if f.onTagged(ctx, sp.ID, sp.FilamentTypeID, rep.MaterialUUID) {
+				if fresh, err := f.ss.Get(ctx, sp.ID); err == nil {
+					sp = fresh
+					f.spools[sp.ID] = sp
+				}
+			}
 		}
 
 		if tool.ConsumedWeight != nil && rep.FullWeight != nil {

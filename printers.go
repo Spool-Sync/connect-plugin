@@ -757,7 +757,10 @@ func (s *service) materialForTag(r *http.Request, rep *connectorapi.ReportedMate
 	}
 
 	created, err := s.ss.CreateFilamentType(r.Context(), spoolsync.NewFilamentType{
-		Brand: "", Material: typ, Name: typ, Color: nonEmpty(rep.ColorRGBA), DiameterMM: 1.75, SpoolWeightG: 200,
+		// The tag's material uuid rides along, so the catalogue import turns
+		// this stand-in into the real material, with its spools on it.
+		OptMaterialUUID: nonEmpty(rep.MaterialUUID),
+		Brand:           "", Material: typ, Name: typ, Color: nonEmpty(rep.ColorRGBA), DiameterMM: 1.75, SpoolWeightG: 200,
 	})
 	if err != nil {
 		return "", err
@@ -858,3 +861,36 @@ func toolRowOf(p follower.Printer, e follower.ToolEntry, spools map[string]spool
 
 // isNotFound is true for a SpoolSync answer of 404.
 func isNotFound(err error) bool { return errors.Is(err, spoolsync.ErrNotFound) }
+
+// linkTagged puts a tagged spool on the material its tag names. A spool on a
+// stand-in custom material moves to the catalogue's material when SpoolSync
+// holds it, and otherwise the stand-in takes the tag's material uuid, so the
+// next catalogue import turns it into the real one. It answers whether the
+// spool moved.
+func (s *service) linkTagged(ctx context.Context, spoolID, filamentTypeID, materialUUID string) bool {
+	ft, err := s.ss.FilamentType(ctx, filamentTypeID)
+	if err != nil || !ft.Custom {
+		return false
+	}
+
+	real, err := s.ss.FilamentTypeByOpt(ctx, materialUUID)
+
+	switch {
+	case err == nil && real.ID != ft.ID:
+		if _, err = s.ss.Update(ctx, spoolID, spoolsync.SpoolUpdate{FilamentTypeID: &real.ID}); err != nil {
+			s.log.Warn("could not move a tagged spool to its material", "spool", spoolID, "material", real.ID, "error", err)
+
+			return false
+		}
+
+		s.log.Info("moved a tagged spool to its catalogue material", "spool", spoolID, "from", ft.ID, "to", real.ID)
+
+		return true
+	case errors.Is(err, spoolsync.ErrNotFound) && ft.OptMaterialUUID == nil:
+		if _, err = s.ss.UpdateFilamentType(ctx, ft.ID, map[string]any{"optMaterialUuid": materialUUID}); err != nil {
+			s.log.Warn("could not name the tag's material on a stand-in", "material", ft.ID, "error", err)
+		}
+	}
+
+	return false
+}

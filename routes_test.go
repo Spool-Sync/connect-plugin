@@ -192,6 +192,16 @@ func (f *fakeSS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		reply(404, map[string]any{"message": "no"})
+	case r.Method == "PUT" && strings.HasPrefix(p, "/filament-types/"):
+		t, ok := f.types[strings.TrimPrefix(p, "/filament-types/")]
+		if !ok {
+			reply(404, map[string]any{"message": "no"})
+
+			return
+		}
+
+		maps.Copy(t, body)
+		reply(200, t)
 	case r.Method == "GET" && strings.HasPrefix(p, "/filament-types/") && !strings.Contains(p, "sync"):
 		t, ok := f.types[strings.TrimPrefix(p, "/filament-types/")]
 		if !ok {
@@ -205,7 +215,7 @@ func (f *fakeSS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id := f.id("ft")
 		t := map[string]any{"filamentTypeId": id, "name": body["name"], "brand": body["brand"], "material": body["material"],
 			"colorHex": body["colorHex"], "diameter_mm": body["diameter_mm"], "density_g_cm3": body["density_g_cm3"],
-			"spoolWeight_g": body["spoolWeight_g"], "optMaterialUuid": nil, "custom": true}
+			"spoolWeight_g": body["spoolWeight_g"], "optMaterialUuid": body["optMaterialUuid"], "custom": true}
 		f.types[id] = t
 		reply(201, t)
 	case r.Method == "GET" && p == "/spools":
@@ -261,6 +271,10 @@ func (f *fakeSS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			delete(f.spools, id)
 			w.WriteHeader(204)
 		case "PUT":
+			if v, ok := body["filamentTypeId"]; ok {
+				sp["filamentTypeId"] = v
+			}
+
 			if v, ok := body["currentWeight_g"]; ok {
 				sp["currentWeight_g"] = v
 			}
@@ -412,6 +426,7 @@ func newRig(t *testing.T, printer deviceapi.Device) *rig {
 	r.svc.fo = follower.New(r.fleet, func(context.Context, busapi.SubscribeParams, func(busapi.Window) error) error { return nil },
 		client, st, silent)
 	r.svc.fo.Notify(r.svc.emitTool, r.svc.emitSpoolWritten)
+	r.svc.fo.OnTagged(r.svc.linkTagged)
 
 	if err = r.svc.fo.Full(t.Context()); err != nil {
 		t.Fatal(err)
@@ -773,5 +788,43 @@ func TestAddReportedFallsBackToTheCataloguesNominalWeight(t *testing.T) {
 
 	if len(r.ss.types) != before {
 		t.Fatal("a custom material was made for a tag the catalogue knows")
+	}
+}
+
+// A tag on a stand-in material moves its spool to the catalogue's material, and
+// a stand-in made while the catalogue lacks it carries the tag's material uuid.
+func TestATaggedSpoolLinksToTheMaterialItsTagNames(t *testing.T) {
+	const uuid = "bf63e92d-9ca5-53d7-9fab-ffdd0240c589"
+
+	r := newRig(t, printerWith("IDLE", map[string]map[string]any{"0": {
+		connectorapi.MaterialInstanceUUID: uuid,
+		connectorapi.MaterialUUID:         "opt-unknown",
+		connectorapi.MaterialType:         "PLA",
+		connectorapi.ConsumedWeight:       0.0,
+	}}))
+	r.access = allow{"user:alpha operate p1": true, "user:alpha observe p1": true}
+	r.svc.access = r.access
+
+	rec := r.call(t, "POST", "/printers/p1/tools/0/spool", `{"remaining_weight_g":900}`, "user:alpha")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("answered %d %s", rec.Code, rec.Body.String())
+	}
+
+	spool := decode(t, rec)
+	stand := r.ss.types[spool["material_uuid"].(string)]
+	if stand["custom"] != true || stand["optMaterialUuid"] != "opt-unknown" {
+		t.Fatalf("the stand-in is %v, want a custom type that names the tag's material", stand)
+	}
+
+	// The catalogue learns the material: the next look at the tool moves the spool.
+	r.ss.types["ft1"]["optMaterialUuid"] = "opt-unknown"
+	stand["optMaterialUuid"] = nil
+
+	if err := r.svc.fo.Full(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := r.ss.spools[spool["id"].(string)]["filamentTypeId"]; got != "ft1" {
+		t.Fatalf("the spool is on %v, want the catalogue's ft1", got)
 	}
 }

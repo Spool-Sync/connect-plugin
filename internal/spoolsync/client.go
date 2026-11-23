@@ -130,6 +130,9 @@ type Location struct {
 
 // NewFilamentType is what making a custom filament type sends.
 type NewFilamentType struct {
+	// OptMaterialUUID is the OpenPrintTag material uuid, nil for none. The
+	// catalogue import later turns a type that carries it into the real one.
+	OptMaterialUUID          *string
 	Brand, Material, Name    string
 	Color                    *string
 	DiameterMM, SpoolWeightG float64
@@ -174,6 +177,8 @@ type NewSpool struct {
 // SpoolUpdate is what editing a spool sends. A nil field is left as it is. A
 // LocationID of "" clears the location.
 type SpoolUpdate struct {
+	// FilamentTypeID, when set, moves the spool to that filament type.
+	FilamentTypeID *string
 	Status         *string
 	LocationID     *string
 	CurrentWeightG *float64
@@ -303,6 +308,10 @@ func (c *Client) Update(ctx context.Context, id string, u SpoolUpdate) (Spool, e
 
 	if u.Status != nil {
 		body["status"] = *u.Status
+	}
+
+	if u.FilamentTypeID != nil {
+		body["filamentTypeId"] = *u.FilamentTypeID
 	}
 
 	if u.LocationID != nil {
@@ -517,6 +526,10 @@ func (c *Client) CreateFilamentType(ctx context.Context, n NewFilamentType) (Fil
 
 	if n.Color != nil {
 		body["colorHex"] = *n.Color
+	}
+
+	if n.OptMaterialUUID != nil {
+		body["optMaterialUuid"] = *n.OptMaterialUUID
 	}
 
 	if n.DensityG != nil {

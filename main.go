@@ -198,6 +198,7 @@ func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 				fo := follower.New(deviceapi.NewClient(conn), subscribe, client, st, log)
 				svc.fo = fo
 				fo.Notify(svc.emitTool, svc.emitSpoolWritten)
+				fo.OnTagged(svc.linkTagged)
 
 				mod.swap(db, svc.routes(), func(ctx context.Context) { _ = fo.Run(ctx) })
 
