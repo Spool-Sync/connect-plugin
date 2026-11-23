@@ -30,6 +30,7 @@ export const operationTable = {
   "list-types": { id: "list-types", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/types", response: "json", anonymous: false },
   "merge-spool": { id: "merge-spool", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/spools/{id}/merge", body: "application/json", response: "json", anonymous: false },
   "read-catalogue": { id: "read-catalogue", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/catalogue", response: "json", anonymous: false },
+  "read-overview": { id: "read-overview", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/overview", response: "json", anonymous: false },
   "read-status": { id: "read-status", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/status", response: "json", anonymous: false },
   "rename-location": { id: "rename-location", method: "PATCH", path: "/api/v1/modules/com.github.aux.prusa3d.materials/locations/{id}", body: "application/json", response: "json", anonymous: false },
   "star-material": { id: "star-material", method: "PUT", path: "/api/v1/modules/com.github.aux.prusa3d.materials/favourites/{uuid}", response: "none", anonymous: false },
@@ -322,6 +323,16 @@ export interface Operations {
   ): Promise<operations["read-catalogue"]["responses"][200]["content"]["application/json"]>;
 
   /**
+   * GET /api/v1/modules/com.github.aux.prusa3d.materials/overview
+   *
+   * The stock at a glance
+   */
+  readOverview(
+    request?: Record<string, never>,
+    signal?: AbortSignal,
+  ): Promise<operations["read-overview"]["responses"][200]["content"]["application/json"]>;
+
+  /**
    * GET /api/v1/modules/com.github.aux.prusa3d.materials/status
    *
    * What the module is doing
@@ -434,6 +445,7 @@ export function bindOperations(transport: Transport): Operations {
     listTypes: (request = {}, signal) => transport.call(operationTable["list-types"], request, signal),
     mergeSpool: (request, signal) => transport.call(operationTable["merge-spool"], request, signal),
     readCatalogue: (request = {}, signal) => transport.call(operationTable["read-catalogue"], request, signal),
+    readOverview: (request = {}, signal) => transport.call(operationTable["read-overview"], request, signal),
     readStatus: (request = {}, signal) => transport.call(operationTable["read-status"], request, signal),
     renameLocation: (request, signal) => transport.call(operationTable["rename-location"], request, signal),
     starMaterial: (request, signal) => transport.call(operationTable["star-material"], request, signal),

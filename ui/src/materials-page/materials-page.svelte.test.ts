@@ -35,6 +35,19 @@ const listing = (rows: ReturnType<typeof row>[], extra = {}) => ({
   ...extra,
 });
 
+const OVERVIEW = {
+  spools: 3,
+  grams: 1500,
+  materials: 1,
+  by_material: [
+    { material: 'PLA', spools: 3, grams: 1500, colours: ['#ff0000'] },
+  ],
+  by_type: [
+    { id: 'a', label: 'Prusament PLA a', colour: '#ff0000', grams: 1500 },
+  ],
+  usage: [],
+};
+
 const started = (
   body: unknown,
   {
@@ -53,6 +66,7 @@ const started = (
         { status: 200, body: { filters: {} } },
       ],
       [MATERIALS]: [{ status: 200, body }],
+      [`/api/v1/modules/${NS}/overview`]: [{ status: 200, body: OVERVIEW }],
       [`/api/v1/modules/${NS}/catalogue/brands`]: [
         {
           status: 200,
@@ -80,7 +94,7 @@ const started = (
 };
 
 const draw = async (stub: Stub): Promise<void> => {
-  const component = stub.registered.pages.materials;
+  const component = stub.registered.pages.spoolsync;
   expect(component).toBeDefined();
   await render(component!);
 };
@@ -105,16 +119,29 @@ describe('the materials page', () => {
     await expect
       .element(page.getByRole('button', { name: 'Add spool' }))
       .toBeInTheDocument();
-    await expect
-      .element(page.getByText('1.5 kg in stock · 3 spools'))
-      .toBeInTheDocument();
   });
 
-  it('counts one spool in stock in the singular', async () => {
-    await draw(started(listing([row('a')], { stock_spools: 1 })));
+  it('shows the stock at a glance above the list', async () => {
+    await draw(started(listing([row('a')])));
+    await expect.element(page.getByText('Spools in stock')).toBeInTheDocument();
+    await expect.element(page.getByText('1.5 kg').first()).toBeInTheDocument();
     await expect
-      .element(page.getByText('1.5 kg in stock · 1 spool', { exact: true }))
+      .element(page.getByText('3 spools · 1.5 kg', { exact: true }))
       .toBeInTheDocument();
+    await expect
+      .element(page.getByText('Remaining by filament type'))
+      .toBeInTheDocument();
+    await expect.element(page.getByText('No history yet')).toBeInTheDocument();
+  });
+
+  it('narrows the list to a material from its tile, and lets go on a second press', async () => {
+    const stub = started(listing([row('a')]));
+    await draw(stub);
+    const tile = page.getByRole('button', { name: /^PLA 3/ });
+    await tile.click();
+    await expect.poll(() => lastList(stub).searchParams.get('type')).toBe('PLA');
+    await tile.click();
+    await expect.poll(() => lastList(stub).searchParams.get('type')).toBe(null);
   });
 
   it('leaves Add spool and + away for a person who may not operate', async () => {
@@ -238,6 +265,7 @@ describe('the materials page', () => {
     await expect.element(page.getByText('PLA a')).toBeInTheDocument();
     const tr = page.getByRole('row').filter({ hasText: 'PLA a' });
     const brand = tr.getByText('Prusament').element();
+    brand.scrollIntoView({ block: 'center' });
 
     expect(at(brand)?.closest('a')?.getAttribute('href')).toBe(
       stub.host.pageHref('material') + '?uuid=a',

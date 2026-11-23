@@ -828,3 +828,31 @@ func TestATaggedSpoolLinksToTheMaterialItsTagNames(t *testing.T) {
 		t.Fatalf("the spool is on %v, want the catalogue's ft1", got)
 	}
 }
+
+func TestTheOverviewTotalsTheStockByMaterialAndType(t *testing.T) {
+	r := newRig(t, printerWith("IDLE", nil))
+	r.call(t, "POST", "/spools", `{"material_uuid":"ft1","remaining_weight_g":800,"quantity":2}`, "user:alpha")
+
+	rec := r.call(t, "GET", "/overview", "", "user:alpha")
+	if rec.Code != 200 {
+		t.Fatalf("the overview answered %d: %s", rec.Code, rec.Body.String())
+	}
+
+	o := decode(t, rec)
+	if o["spools"] != 2.0 || o["materials"] != 1.0 {
+		t.Fatalf("the overview counts %v spools of %v materials, want 2 of 1", o["spools"], o["materials"])
+	}
+
+	tiles := o["by_material"].([]any)
+	if len(tiles) != 1 || tiles[0].(map[string]any)["spools"] != 2.0 {
+		t.Fatalf("the material tiles are %v", tiles)
+	}
+
+	if bars := o["by_type"].([]any); len(bars) != 1 || bars[0].(map[string]any)["id"] != "ft1" {
+		t.Fatalf("the type bars are %v", bars)
+	}
+
+	if _, ok := o["usage"].([]any); !ok {
+		t.Fatalf("the usage is %v, want a list even when SpoolSync has none", o["usage"])
+	}
+}

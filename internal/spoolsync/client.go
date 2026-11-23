@@ -884,3 +884,29 @@ func (c *Client) SyncPrinters(ctx context.Context, printers []PrinterReport) ([]
 
 	return out.Printers, nil
 }
+
+// UsageSeries is the filament held on spools of one filament type, a point a day.
+type UsageSeries struct {
+	FilamentTypeID string       `json:"filamentTypeId"`
+	Label          string       `json:"label"`
+	ColorHex       *string      `json:"colorHex"`
+	Data           []UsagePoint `json:"data"`
+}
+
+// UsagePoint is one day of a UsageSeries: the date as YYYY-MM-DD and the grams.
+type UsagePoint struct {
+	Date   string  `json:"date"`
+	TotalG float64 `json:"total_g"`
+}
+
+// UsageTrend is SpoolSync's dashboard usage chart, for the last days.
+func (c *Client) UsageTrend(ctx context.Context, days int) ([]UsageSeries, error) {
+	var out []UsageSeries
+
+	q := url.Values{"days": {strconv.Itoa(days)}}
+	if err := c.do(ctx, http.MethodGet, "/spools/usage-trend-by-type", q, nil, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}

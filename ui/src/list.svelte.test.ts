@@ -50,6 +50,7 @@ const held = () => {
     addSpools: () => Promise.reject(new Error('unused')),
     spools: () => Promise.reject(new Error('unused')),
     allSpools: () => Promise.resolve([]),
+    overview: () => Promise.reject(new Error('unused')),
     updateSpool: () => Promise.reject(new Error('unused')),
     deleteSpool: () => Promise.reject(new Error('unused')),
     deleteSpools: () => Promise.reject(new Error('unused')),

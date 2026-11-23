@@ -69,7 +69,7 @@ const shiftAt = async (width: number) => {
     },
   });
   void setup(stub.host);
-  await render(stub.registered.pages.materials!);
+  await render(stub.registered.pages.spoolsync!);
 
   await expect
     .element(page.getByRole('status', { name: 'Reading the inventory' }))

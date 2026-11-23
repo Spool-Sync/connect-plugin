@@ -283,7 +283,7 @@ describe('the material page', () => {
     const trail = page.getByRole('navigation', { name: /breadcrumb/iu });
     await expect
       .element(trail.getByRole('link', { name: 'SpoolSync' }))
-      .toHaveAttribute('href', stub.host.pageHref('materials'));
+      .toHaveAttribute('href', stub.host.pageHref('spoolsync'));
     await expect.element(trail.getByText('Galaxy Black')).toBeVisible();
   });
 
@@ -653,7 +653,7 @@ describe('the material page', () => {
       .toBeVisible();
     await expect
       .element(page.getByRole('link', { name: 'Back to the materials' }))
-      .toHaveAttribute('href', expect.stringContaining('/materials'));
+      .toHaveAttribute('href', expect.stringContaining('/spoolsync'));
   });
 
   it('shows the empty state when there is no uuid', async () => {

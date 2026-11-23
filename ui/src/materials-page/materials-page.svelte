@@ -1,5 +1,6 @@
 <!--
-  The materials, on one page.
+  The SpoolSync page: the stock at a glance, then the materials in stock,
+  searchable.
 
   A page takes no props: what it draws comes from the list the module's setup
   built. The section is the container every child reads its width from, so the
@@ -29,7 +30,7 @@
 
   import AddDialog from '../add-dialog/add-dialog.svelte';
   import CreateSpoolDialog from '../create-spool/create-spool-dialog.svelte';
-  import { materialsOn } from '../api';
+  import { materialsOn, type Overview } from '../api';
   import { heldHost } from '../host';
   import { follow } from '../live';
   import { heldList } from '../list.svelte';
@@ -37,7 +38,7 @@
   import FaultNote from './fault-note.svelte';
   import ListFilters from './list-filters.svelte';
   import MaterialRow from './material-row.svelte';
-  import { kilograms } from './weights';
+  import OverviewPanel from './overview.svelte';
 
   const list = heldList();
   const host = heldHost();
@@ -51,6 +52,33 @@
   const narrowed = $derived(Object.keys(list.query).length > 0);
 
   const service = materialsOn(host);
+
+  /** The dashboard above the list, undefined until it is read. */
+  let overview = $state<Overview | undefined>(undefined);
+  const EMPTY: Overview = {
+    spools: 0,
+    grams: 0,
+    materials: 0,
+    by_material: [],
+    by_type: [],
+    usage: [],
+  };
+  /** Reads the overview again. One that fails keeps what was shown. */
+  const reread = (): void => {
+    service
+      .overview()
+      .then((fresh) => (overview = { ...EMPTY, ...fresh }))
+      .catch(() => (overview ??= EMPTY));
+  };
+  /** After a write: the list and the overview both read again. */
+  const refresh = (): void => {
+    void list.read();
+    reread();
+  };
+  /** A material tile narrows the list to its type, and a second press lets go. */
+  const pick = (material: string): void => {
+    void list.narrow({ type: list.query.type === material ? undefined : material });
+  };
   /** The filters as the module keeps them, once they are read. */
   let saved: string | undefined;
 
@@ -59,6 +87,7 @@
   onMount(() => {
     const stream = new AbortController();
     const signal = AbortSignal.any([host.signal, stream.signal]);
+    reread();
     const initial = (async () => {
       const fresh = !list.loaded;
       const recalled = fresh
@@ -76,7 +105,9 @@
       clearTimeout(timer);
       timer = setTimeout(() => {
         void initial.then(() => {
-          if (!signal.aborted) void list.narrow({});
+          if (signal.aborted) return;
+          void list.narrow({});
+          reread();
         });
       }, 300);
     });
@@ -117,12 +148,7 @@
     {/snippet}
   </PageHeader>
 
-  <p data-part="stock" class="text-sm text-muted-foreground">
-    {t('materials.page.stock', {
-      kg: kilograms(list.stock.grams),
-      spools: list.stock.spools,
-    })}
-  </p>
+  <OverviewPanel part="top" {overview} />
 
   {#if list.mayOnlyRead}
     <p data-part="viewer" class="text-sm text-muted-foreground">
@@ -201,17 +227,18 @@
       </div>
     </CardContent>
   </Card>
+  <OverviewPanel part="bottom" {overview} selected={list.query.type} onpick={pick} />
 </section>
 
 <AddDialog
   open={adding !== undefined}
   material={adding?.material}
   onclose={() => (adding = undefined)}
-  onadded={() => void list.read()}
+  onadded={refresh}
 />
 
 <CreateSpoolDialog
   open={creatingSpool}
   onclose={() => (creatingSpool = false)}
-  oncreated={() => void list.read()}
+  oncreated={refresh}
 />

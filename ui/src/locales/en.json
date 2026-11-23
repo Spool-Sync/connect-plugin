@@ -5,7 +5,6 @@
   "materials.page.title": "SpoolSync",
   "materials.page.add": "Add material",
   "materials.page.reading": "Reading the inventory",
-  "materials.page.stock": "{kg} kg in stock · {spools, plural, one {# spool} other {# spools}}",
   "materials.page.viewer": "You can look at the materials but not change them.",
   "materials.page.more": "Show more",
   "materials.page.empty.heading": "No spools yet",
@@ -440,5 +439,17 @@
   "error.spool-sync/SPOOL_INVALID": "One field of this spool is outside what the module accepts.",
   "error.spool-sync/STORE_FAILED": "The record store did not answer. Try again in a moment.",
   "error.spool-sync/WEIGHT_NEEDED": "The tag holds no full weight, so the weight left on the spool is needed.",
-  "error.spool-sync/TOOL_REFUSED": "The material on this tool cannot be changed in the printer's current state."
+  "error.spool-sync/TOOL_REFUSED": "The material on this tool cannot be changed in the printer's current state.",
+  "materials.overview.spools": "Spools in stock",
+  "materials.overview.inventory": "Inventory",
+  "materials.overview.materials": "Materials",
+  "materials.overview.kg": "{kg} kg",
+  "materials.overview.g": "{g} g",
+  "materials.overview.usage": "Filament usage",
+  "materials.overview.noHistory": "No history yet",
+  "materials.overview.byMaterial": "By material",
+  "materials.overview.none": "Nothing in stock",
+  "materials.overview.inventoryTitle": "Material inventory",
+  "materials.overview.tile": "{spools, plural, one {# spool} other {# spools}} · {weight}",
+  "materials.overview.byType": "Remaining by filament type"
 }

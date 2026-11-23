@@ -99,9 +99,13 @@ ui:
     # host.register call behind it in ui/src/index.ts. The paths and ids are
     # Materials' own, so links carry over.
     pages:
-      - path: materials
+      - path: spoolsync
         title: SpoolSync
         icon: materials
+      # The old address, kept so a link or bookmark to it still opens the page.
+      - path: materials
+        title: SpoolSync
+        hidden: true
       - path: material
         title: Material
         hidden: true

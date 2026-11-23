@@ -6,7 +6,6 @@
   "materials.page.add": "Přidat materiál",
   "materials.page.custom": "Vlastní materiál",
   "materials.page.reading": "Načítám materiály",
-  "materials.page.stock": "{kg} kg na skladě · {spools, plural, one {# cívka} few {# cívky} many {# cívky} other {# cívek}}",
   "materials.page.viewer": "Materiály si můžeš prohlížet, ale ne měnit.",
   "materials.page.more": "Zobrazit další",
   "materials.page.empty.heading": "Zatím žádné cívky",
@@ -421,5 +420,17 @@
   "error.spool-sync/SPOOL_ON_ANOTHER_TOOL": "Tato cívka je v jiném nástroji tiskárny. Nejdřív ji tam odeber.",
   "error.spool-sync/SPOOL_INVALID": "Jedno pole této cívky je mimo hodnoty, které modul přijímá.",
   "error.spool-sync/STORE_FAILED": "Úložiště záznamů neodpovědělo. Zkus to za chvíli znovu.",
-  "error.spool-sync/TOOL_REFUSED": "Materiál v tomto nástroji nelze změnit v aktuálním stavu tiskárny."
+  "error.spool-sync/TOOL_REFUSED": "Materiál v tomto nástroji nelze změnit v aktuálním stavu tiskárny.",
+  "materials.overview.spools": "Cívek skladem",
+  "materials.overview.inventory": "Zásoba",
+  "materials.overview.materials": "Materiály",
+  "materials.overview.kg": "{kg} kg",
+  "materials.overview.g": "{g} g",
+  "materials.overview.usage": "Spotřeba filamentu",
+  "materials.overview.noHistory": "Zatím bez historie",
+  "materials.overview.byMaterial": "Podle materiálu",
+  "materials.overview.none": "Nic skladem",
+  "materials.overview.inventoryTitle": "Zásoba materiálů",
+  "materials.overview.tile": "{spools, plural, one {# cívka} few {# cívky} other {# cívek}} · {weight}",
+  "materials.overview.byType": "Zbývá podle typu filamentu"
 }

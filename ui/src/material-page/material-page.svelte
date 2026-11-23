@@ -496,7 +496,7 @@
        heading, ending in this material's name. -->
   <PageTrail
     trail={[
-      { label: t('materials.page.title'), href: host.pageHref('materials') },
+      { label: t('materials.page.title'), href: host.pageHref('spoolsync') },
     ]}
     page={detail?.name ?? t('materials.material.page.title')}
   />
@@ -509,7 +509,7 @@
     >
       {#snippet action()}
         <a
-          href={host.pageHref('materials')}
+          href={host.pageHref('spoolsync')}
           class="underline underline-offset-4"
         >
           {t('materials.material.back')}

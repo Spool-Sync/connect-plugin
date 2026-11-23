@@ -1206,6 +1206,28 @@
           }
         }
       }
+    },
+    "/overview": {
+      "get": {
+        "operationId": "read-overview",
+        "summary": "The stock at a glance",
+        "description": "What SpoolSync's dashboard shows of the spools in stock: how many, the filament they hold, the filament by material and by filament type, most first, and SpoolSync's usage chart of the last 30 days. A usage chart SpoolSync cannot answer comes back empty. The host takes view_resource on the module's instance before this is called.",
+        "responses": {
+          "200": {
+            "description": "The overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2223,6 +2245,142 @@
           "tools",
           "total"
         ]
+      },
+      "Overview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "spools",
+          "grams",
+          "materials",
+          "by_material",
+          "by_type",
+          "usage"
+        ],
+        "properties": {
+          "spools": {
+            "type": "integer",
+            "description": "The spools in stock."
+          },
+          "grams": {
+            "type": "number",
+            "description": "The filament they hold, in grams."
+          },
+          "materials": {
+            "type": "integer",
+            "description": "How many materials (PLA, PETG...) they are."
+          },
+          "by_material": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "material",
+                "spools",
+                "grams",
+                "colours"
+              ],
+              "properties": {
+                "material": {
+                  "type": "string"
+                },
+                "spools": {
+                  "type": "integer"
+                },
+                "grams": {
+                  "type": "number"
+                },
+                "colours": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Up to 8 of the spools' colours."
+                }
+              }
+            }
+          },
+          "by_type": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "colour",
+                "grams"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "colour": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "#rrggbb or #rrggbbaa."
+                },
+                "grams": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "usage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "colour",
+                "points"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "colour": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "#rrggbb or #rrggbbaa."
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "date",
+                      "grams"
+                    ],
+                    "properties": {
+                      "date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD."
+                      },
+                      "grams": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
