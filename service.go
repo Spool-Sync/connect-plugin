@@ -62,6 +62,9 @@ type service struct {
 
 	mu       sync.Mutex
 	operates map[operateKey]operateAnswer
+
+	// mirrorKick asks runMirror for a report now.
+	mirrorKick chan struct{}
 }
 
 type operateKey struct{ person, action, device string }
@@ -245,7 +248,7 @@ func newService(ss *spoolsync.Client, st *store.Store, log *slog.Logger, maxSpoo
 ) *service {
 	return &service{
 		ss: ss, st: st, log: log, maxSpools: maxSpools, access: access, emit: emit,
-		operates: map[operateKey]operateAnswer{},
+		operates: map[operateKey]operateAnswer{}, mirrorKick: make(chan struct{}, 1),
 	}
 }
 

@@ -93,7 +93,7 @@ name instead.
 The SpoolSync token needs: `spools:view`, `spools:create`, `spools:edit`,
 `spools:delete`, `filament_types:view`, `filament_types:create`,
 `filament_types:edit`, `filament_types:delete`, `storage:view`,
-`storage:create`, `storage:edit`, `storage:delete`.
+`storage:create`, `storage:edit`, `storage:delete`, `printers:view`, `printers:edit` (the printers are reported to SpoolSync: see `mirror.go`).
 
 ## Where the module differs from Materials (review, 2026-11-22)
 

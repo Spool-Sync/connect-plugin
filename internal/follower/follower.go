@@ -80,9 +80,22 @@ type Placement struct {
 // Printer is one printer as the follower last read it.
 type Printer struct {
 	ID, Name, Model string
-	Connected       bool
+	// Serial is the serial number the machine gave, empty when not reported.
+	Serial    string
+	Connected bool
 	// State is the value of the printer's state machine, such as IDLE.
 	State string
+	// Job is the print in progress, nil for none.
+	Job *Job
+}
+
+// Job is what a printer reports of the print it runs.
+type Job struct {
+	// Name is the file's display name, else its path.
+	Name string
+	// Progress is the percentage done and TimeRemaining the seconds left, nil
+	// when not reported.
+	Progress, TimeRemaining *float64
 }
 
 // ToolEntry is one tool of a printer, with the spool it holds.
@@ -1078,6 +1091,34 @@ func printerState(d deviceapi.Device) string {
 
 func printerOf(d deviceapi.Device) Printer {
 	return Printer{
-		ID: d.ID, Name: d.Name, Model: d.Model, Connected: d.Connected, State: printerState(d),
+		ID: d.ID, Name: d.Name, Model: d.Model, Serial: d.Serial, Connected: d.Connected,
+		State: printerState(d), Job: jobOf(d),
 	}
+}
+
+// jobOf reads the print a printer reports, nil when it reports none.
+func jobOf(d deviceapi.Device) *Job {
+	var j Job
+
+	for _, path := range []string{connectorapi.JobDisplayPath, connectorapi.JobPathPath} {
+		if json.Unmarshal(d.State[path], &j.Name) == nil && j.Name != "" {
+			break
+		}
+	}
+
+	number := func(path string) *float64 {
+		var n float64
+		if json.Unmarshal(d.State[path], &n) != nil {
+			return nil
+		}
+
+		return &n
+	}
+
+	j.Progress, j.TimeRemaining = number(connectorapi.JobProgressPath), number(connectorapi.JobTimeRemainingPath)
+	if j.Name == "" && j.Progress == nil {
+		return nil
+	}
+
+	return &j
 }

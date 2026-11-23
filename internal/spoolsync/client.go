@@ -837,3 +837,50 @@ func firstLine(b []byte) string {
 
 	return s
 }
+
+// PrinterReport is one printer as Prusa Connect follows it, for SpoolSync's
+// POST /printers/connect-sync.
+type PrinterReport struct {
+	ConnectID  string       `json:"connectId"`
+	Name       string       `json:"name,omitempty"`
+	Serial     string       `json:"serial,omitempty"`
+	Model      string       `json:"model,omitempty"`
+	Status     string       `json:"status"`
+	ActiveTool *int         `json:"activeTool"`
+	Job        *JobReport   `json:"job"`
+	Slots      []SlotReport `json:"slots"`
+}
+
+// JobReport is the print a printer runs.
+type JobReport struct {
+	Name          string   `json:"name,omitempty"`
+	Progress      *float64 `json:"progress,omitempty"`
+	TimeRemaining *float64 `json:"timeRemaining,omitempty"`
+}
+
+// SlotReport is the spool in one slot of a printer, nil for none.
+type SlotReport struct {
+	Index   int     `json:"index"`
+	SpoolID *string `json:"spoolId"`
+}
+
+// SyncResult is what SpoolSync did with one printer: the SpoolSync printer it
+// is, or why it failed.
+type SyncResult struct {
+	ConnectID string `json:"connectId"`
+	PrinterID string `json:"printerId,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// SyncPrinters reports the printers Prusa Connect follows.
+func (c *Client) SyncPrinters(ctx context.Context, printers []PrinterReport) ([]SyncResult, error) {
+	var out struct {
+		Printers []SyncResult `json:"printers"`
+	}
+
+	if err := c.do(ctx, http.MethodPost, "/printers/connect-sync", nil, map[string]any{"printers": printers}, &out); err != nil {
+		return nil, err
+	}
+
+	return out.Printers, nil
+}

@@ -86,6 +86,8 @@ type toolEvent struct {
 
 // emitTool tells the event stream what a tool holds now. The follower calls it when a binding changes.
 func (s *service) emitTool(printerID, toolID string) {
+	s.kickMirror()
+
 	ev := toolEvent{DeviceID: printerID, ToolID: toolID}
 
 	entries, _ := s.fo.Tools(printerID)

@@ -48,7 +48,7 @@ options:
   - key: spoolsync_token
     type: secret
     required: true
-    summary: A SpoolSync API token (ss_...) with every spools, filament_types and storage permission (view, create, edit, delete).
+    summary: A SpoolSync API token (ss_...) with every spools, filament_types and storage permission (view, create, edit, delete), and printers view and edit. SpoolSync's "Prusa Connect" token preset has them.
   - key: max_spools
     type: int
     default: "2000"

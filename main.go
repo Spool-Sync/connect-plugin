@@ -200,7 +200,11 @@ func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 				fo.Notify(svc.emitTool, svc.emitSpoolWritten)
 				fo.OnTagged(svc.linkTagged)
 
-				mod.swap(db, svc.routes(), func(ctx context.Context) { _ = fo.Run(ctx) })
+				mod.swap(db, svc.routes(), func(ctx context.Context) {
+					go svc.runMirror(ctx)
+
+					_ = fo.Run(ctx)
+				})
 
 				fmt.Fprintf(os.Stderr, "%s keeps its data in %s at schema version %d and writes to %s\n",
 					name, grants.Database, report.Version, sent.SpoolSyncURL)
