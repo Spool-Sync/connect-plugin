@@ -1,5 +1,9 @@
 # SpoolSync for Prusa Connect
 
+> Maintained on [GitLab](https://gitlab.honex.life/spoolsync/spool-sync-prusa-connect).
+> [GitHub](https://github.com/Spool-Sync/spool-sync-prusa-connect) is a read-only mirror;
+> see [CONTRIBUTING](CONTRIBUTING.md).
+
 A Prusa Connect module that replaces the Materials extension. SpoolSync is the
 only inventory: materials are SpoolSync filament types, spools are SpoolSync
 spools, locations are SpoolSync storage locations. The module follows every
