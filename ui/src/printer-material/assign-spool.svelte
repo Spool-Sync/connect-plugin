@@ -1,6 +1,7 @@
 <!--
   Puts a spool on a printer tool: SpoolSync's spool picker over every live
-  spool, and the footer. The spool the tool holds, if any, is chosen to begin
+  spool of the material the printer reports on the tool (every spool when it
+  reports none, or a name of its own), and the footer. The spool the tool holds, if any, is chosen to begin
   with, so Replace is one press on Load. + Create spool makes a spool in the
   dialog it opens and chooses it once it is made.
 
@@ -16,6 +17,7 @@
   import CreateSpoolDialog from '../create-spool/create-spool-dialog.svelte';
   import { heldHost } from '../host';
   import FaultNote from '../materials-page/fault-note.svelte';
+  import { requiredMaterial } from './material-match';
   import SpoolPicker from '../spool-picker/spool-picker.svelte';
   import { refusalText } from './reasons';
 
@@ -39,6 +41,9 @@
   } = $props();
 
   const t = heldHost().t;
+
+  /** The material the printer holds on the tool, which the spool must be. */
+  const material = $derived(requiredMaterial(tool.reported?.abbreviation));
 
   let spools = $state.raw<readonly Spool[]>();
   let fault = $state.raw<unknown>(undefined);
@@ -98,6 +103,7 @@
   {:else if spools !== undefined}
     <SpoolPicker
       {spools}
+      {material}
       selected={spoolId}
       onselect={(id: string | undefined) => (spoolId = id)}
     />
@@ -143,6 +149,7 @@
 
 <CreateSpoolDialog
   open={creating}
+  type={material}
   onclose={() => (creating = false)}
   oncreated={created}
 />

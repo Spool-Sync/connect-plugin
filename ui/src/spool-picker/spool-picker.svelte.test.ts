@@ -31,16 +31,51 @@ const spool = (id: string, extra: Partial<Spool> = {}): Spool =>
     ...extra,
   }) as Spool;
 
-const draw = async (spools: readonly Spool[], selected?: string) => {
+const draw = async (
+  spools: readonly Spool[],
+  selected?: string,
+  material?: string,
+) => {
   const onselect = vi.fn<(id: string | undefined) => void>();
   const stub = stubHost([{ status: 200, body: {} }]);
   void setup(stub.host);
-  await render(SpoolPicker, { spools, selected, onselect });
+  await render(SpoolPicker, { spools, selected, onselect, material });
 
   return { onselect };
 };
 
 describe('the spool picker', () => {
+  it('offers only the material the printer reports, with no type to pick', async () => {
+    await draw(
+      [
+        spool('1'),
+        spool('2', { material_name: 'Woodfill', type: 'WOOD' }),
+        spool('3', { material_name: 'PETG Clear', type: 'PETG' }),
+      ],
+      undefined,
+      'PLA',
+    );
+
+    await expect
+      .element(page.getByRole('button', { name: /Galaxy Black/ }))
+      .toBeVisible();
+    await expect
+      .element(page.getByRole('button', { name: /Woodfill/ }))
+      .toBeVisible();
+    expect(page.getByRole('button', { name: /PETG Clear/ }).query()).toBe(null);
+    expect(page.getByRole('group', { name: 'Material types' }).query()).toBe(null);
+    await expect
+      .element(page.getByText('the printer reports PLA on this tool', { exact: false }))
+      .toBeVisible();
+  });
+
+  it('says no spool of the reported material is there', async () => {
+    await draw([spool('3', { type: 'PETG' })], undefined, 'ASA');
+    await expect
+      .element(page.getByText('No ASA spools available.', { exact: false }))
+      .toBeVisible();
+  });
+
   it('lists the spools with their weight, location and tool', async () => {
     await draw([
       spool('1', { location: 'Shelf A' }),

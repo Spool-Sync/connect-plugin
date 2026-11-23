@@ -4,6 +4,10 @@
   material-type chips narrow it further. The type chips are the types of the
   chosen manufacturer only. Clicking the selected row lets the choice go.
 
+  With `material`, the material a printer reports on the tool, only spools of
+  that material are offered and the material-type chips are left out: the
+  printer already says which it holds.
+
   Spools on a tool come after the rest: a spool a printer already holds is the
   one a person means least often. The picker keeps no choice of its own; the
   host hands the id in as `selected` and takes the next one from `onselect`.
@@ -18,15 +22,19 @@
   import type { Spool } from '../api';
   import { cssColour } from '../css-colour';
   import { heldHost } from '../host';
+  import { sameMaterial } from '../printer-material/material-match';
   import { toolLabel } from '../printer-material/tool-label';
 
   let {
-    spools,
+    spools: every,
+    material,
     selected,
     onselect,
   }: {
     /** The live spools to choose from. */
     spools: readonly Spool[];
+    /** The material the printer reports on the tool; only its spools are offered. */
+    material?: string | undefined;
     /** The chosen spool's id, undefined when none is chosen. */
     selected: string | undefined;
     /** The id picked, or undefined when the chosen row was picked again. */
@@ -45,6 +53,12 @@
   });
 
   const byName = (a: string, b: string): number => a.localeCompare(b);
+
+  const spools = $derived(
+    material === undefined
+      ? every
+      : every.filter((s) => sameMaterial(material, s.type)),
+  );
 
   const brands = $derived(
     [...new Set(spools.map((s) => s.brand_name).filter((x) => x !== ''))].sort(
@@ -128,7 +142,11 @@
     </div>
   {/if}
 
-  {#if types.length > 0}
+  {#if material !== undefined}
+    <p data-part="reported-material" class="text-sm text-muted-foreground">
+      {t('materials.spoolPicker.reported', { material })}
+    </p>
+  {:else if types.length > 0}
     <div
       class="flex flex-wrap gap-2"
       role="group"
@@ -151,9 +169,13 @@
     >
       <PackageXIcon class="size-8" aria-hidden="true" />
       <p>
-        {spools.length > 0
-          ? t('materials.spoolPicker.noMatch')
-          : t('materials.spoolPicker.none')}
+        {#if spools.length > 0}
+          {t('materials.spoolPicker.noMatch')}
+        {:else if material !== undefined}
+          {t('materials.spoolPicker.noneOf', { material })}
+        {:else}
+          {t('materials.spoolPicker.none')}
+        {/if}
       </p>
     </div>
   {:else}

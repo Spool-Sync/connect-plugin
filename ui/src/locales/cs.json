@@ -433,5 +433,7 @@
   "materials.overview.inventoryTitle": "Zásoba materiálů",
   "materials.overview.tile": "{spools, plural, one {# cívka} few {# cívky} other {# cívek}} · {weight}",
   "materials.overview.byType": "Zbývá podle typu filamentu",
-  "materials.page.credit": "Postaveno na Prusa Connect od Prusa Research"
+  "materials.page.credit": "Postaveno na Prusa Connect od Prusa Research",
+  "materials.spoolPicker.reported": "Zobrazeny cívky {material}: tiskárna hlásí na tomto nástroji {material}.",
+  "materials.spoolPicker.noneOf": "Žádné cívky {material}. Vytvořte novou níže."
 }

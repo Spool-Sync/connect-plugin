@@ -27,6 +27,7 @@
     onclose,
     oncreated,
     title,
+    type: presetType,
   }: {
     open: boolean;
     onclose: () => void;
@@ -34,6 +35,8 @@
     oncreated: (id: string) => void;
     /** The dialog's heading; Create spool when left out. */
     title?: string;
+    /** The material type to begin with, such as the one a printer reports. */
+    type?: string | undefined;
   } = $props();
 
   const host = heldHost();
@@ -105,7 +108,7 @@
   const reset = (): void => {
     turn += 1;
     manufacturer = '';
-    type = '';
+    type = presetType ?? '';
     catalogue = [];
     added = [];
     chosen = undefined;
