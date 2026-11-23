@@ -3,16 +3,27 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
-## Unreleased
+## 0.2.0 - 2026-11-23
 
 ### Added
 
+- **Load spool knows the tool**: the dialog lists only spools of the material
+  the printer reports on the tool (PLA also takes WOOD, PC takes PCCF, FLEX
+  takes TPU and TPE), without asking for the material, and Create spool starts
+  on that material. The spools nearest the colour the printer reports come
+  first. A spool already loaded on another tool comes last, greyed out, and
+  picking it asks first, naming the printer and tool it is on.
 - **Two-way tools**: a spool assigned to a printer's slot, cleared, or a weight
   corrected in SpoolSync's own UI now reaches the module. SpoolSync sends it
   over an authenticated WebSocket feed, and the module adopts it on its tool.
   The later of the two changes wins, so assigning in either UI is not undone
   by the other. The feed needs `printers:view` on the SpoolSync token; a
   SpoolSync without the feed is followed by polling the same snapshot.
+
+### Fixed
+
+- The Tools tab showed a spool's full weight short by the empty spool, so a
+  full spool read as more filament left than it held (868 / 668 g).
 
 ## 0.1.0 - 2026-11-23
 
