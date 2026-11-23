@@ -16,7 +16,7 @@ jobs:
     uses: prusa3d/prusa-connect-marketplace-publish/.github/workflows/publish.yml@v1
     with:
       path: .
-      module: github.com/spool-sync/connect
+      module: github.com/spool-sync/connect-plugin
       node-version: '26'
       bundle-command: sh scripts/marketplace-bundle.sh
       bundle-output: marketplace-bundle

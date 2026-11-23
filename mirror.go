@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spool-sync/connect/internal/follower"
-	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect-plugin/internal/follower"
+	"github.com/spool-sync/connect-plugin/internal/spoolsync"
 )
 
 // mirrorEvery is how often the printers are reported to SpoolSync when no

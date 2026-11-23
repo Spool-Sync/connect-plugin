@@ -13,8 +13,8 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/routesapi"
 
-	"github.com/spool-sync/connect/internal/follower"
-	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect-plugin/internal/follower"
+	"github.com/spool-sync/connect-plugin/internal/spoolsync"
 )
 
 // mount is the handler of every route. A route runs with the person the host

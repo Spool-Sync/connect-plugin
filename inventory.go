@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect-plugin/internal/spoolsync"
 )
 
 // inventory is where the spools, filament types and locations are kept: a

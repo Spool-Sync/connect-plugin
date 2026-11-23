@@ -9,10 +9,10 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/connectorapi"
 
-	"github.com/spool-sync/connect/internal/assign"
-	"github.com/spool-sync/connect/internal/follower"
-	"github.com/spool-sync/connect/internal/spoolsync"
-	"github.com/spool-sync/connect/internal/store"
+	"github.com/spool-sync/connect-plugin/internal/assign"
+	"github.com/spool-sync/connect-plugin/internal/follower"
+	"github.com/spool-sync/connect-plugin/internal/spoolsync"
+	"github.com/spool-sync/connect-plugin/internal/store"
 )
 
 // printerView is a printer in Materials' shape.

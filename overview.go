@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect-plugin/internal/spoolsync"
 )
 
 // usageDays is how far back the usage chart reaches, SpoolSync's dashboard's own span.

@@ -1,7 +1,7 @@
 # SpoolSync for Prusa Connect
 
 > Maintained on [GitLab](https://gitlab.honex.life/spoolsync/spool-sync-prusa-connect).
-> [GitHub](https://github.com/Spool-Sync/connect) is a read-only mirror;
+> [GitHub](https://github.com/Spool-Sync/connect-plugin) is a read-only mirror;
 > see [CONTRIBUTING](CONTRIBUTING.md).
 
 A Prusa Connect module that replaces the Materials extension. SpoolSync is the
@@ -122,8 +122,8 @@ It builds against `github.com/prusa3d/prusa-connect/sdk` at the version in
 
 ## Install
 
-From the Prusa Plugin Marketplace, as `com.github.aux.spool-sync.connect` (module
-path `github.com/spool-sync/connect`), once a release is approved there.
+From the Prusa Plugin Marketplace, as `com.github.aux.spool-sync.connect-plugin` (module
+path `github.com/spool-sync/connect-plugin`), once a release is approved there.
 
 ## Releasing to the marketplace
 
