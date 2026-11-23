@@ -154,6 +154,21 @@ curl -fsS https://cdn.honex.life/value-store/spool-sync/spool-sync-prusa-connect
     -H "Content-Type: application/json" --data-binary @-
 ```
 
+## Licence
+
+OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1, the licence of Prusa Connect, in
+[LICENSE](LICENSE). Built on Prusa Connect by Prusa Research a.s.: the module
+derives from Prusa Connect's Materials extension (its tool rules, its
+consumption math and much of its UI) and is built on the Prusa Connect SDK and
+UI library, so it is distributed under the same licence and add-ons. In short:
+free to use, change and share for individuals and small businesses; a change
+you share stays under this licence and keeps the credit to Prusa Research; a
+business over EUR 1M a year needs a licence from Prusa, and no business may run
+it as a hosted service for others. The LICENSE file holds the full text.
+
+The OpenPrintTag database the module downloads is MIT licensed and is not
+shipped with it.
+
 ## Known limits
 
 - SpoolSync has no owner on a custom material or a spool, so custom materials

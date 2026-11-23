@@ -17,7 +17,7 @@ kind: sink
 version: 0.1.0
 # The licence this module is released under. The marketplace shows it and
 # refuses a release without one. An SPDX identifier is the usual form.
-license: MIT
+license: OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1
 # What a marketplace card prints beside the name: the title a person reads,
 # one sentence about this module, and who answers for it. The install copies
 # them into the declaration, so `GET /api/v1/resources` carries them for an

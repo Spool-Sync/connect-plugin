@@ -432,5 +432,6 @@
   "materials.overview.none": "Nic skladem",
   "materials.overview.inventoryTitle": "Zásoba materiálů",
   "materials.overview.tile": "{spools, plural, one {# cívka} few {# cívky} other {# cívek}} · {weight}",
-  "materials.overview.byType": "Zbývá podle typu filamentu"
+  "materials.overview.byType": "Zbývá podle typu filamentu",
+  "materials.page.credit": "Postaveno na Prusa Connect od Prusa Research"
 }

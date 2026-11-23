@@ -1,5 +1,6 @@
 // Copied from extensions/materials/internal/assign/rules.go in the prusa-connect
-// repository, which is MIT licensed (https://github.com/prusa3d/prusa-connect).
+// repository, by Prusa Research a.s., licensed under
+// OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1 (https://github.com/prusa3d/prusa-connect), as this module is.
 // Unchanged apart from this note.
 // Package assign holds the rules for when a person may change the material
 // on a printer tool.

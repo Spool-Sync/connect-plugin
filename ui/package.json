@@ -4,7 +4,7 @@
   "private": true,
   "description": "The browser half of the SpoolSync module for Prusa Connect: the Materials pages, the catalogue and locations settings, and a printer's Tools tab, on the component library.",
   "type": "module",
-  "license": "MIT",
+  "license": "SEE LICENSE IN ../LICENSE",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

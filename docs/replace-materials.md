@@ -49,7 +49,7 @@ odometer_weight)` per tool in the database. On each reading:
 
 Subtract the grams from SpoolSync's current gross weight and write it. Batch:
 write when the accumulated grams for a spool reach >= 1 g, or at job end.
-Copy the small consume math (MIT, prusa-connect repo) into
+Copy the small consume math (OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1, prusa-connect repo) into
 `internal/consume`, with its tests.
 
 ## Storage

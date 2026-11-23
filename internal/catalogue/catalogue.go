@@ -9,9 +9,8 @@
 // OpenPrintTag specification derives (section 3.2.1).
 //
 // It is SpoolSync's own importer (backend/src/services/openPrintTagCatalogue.js)
-// in Go, so both read the same catalogue into the same rows. SpoolSync is
-// GPLv3; its author, who wrote that importer, licenses this port under this
-// module's MIT licence.
+// in Go, so both read the same catalogue into the same rows. SpoolSync's author,
+// who wrote that importer, licenses this port under this module's licence.
 package catalogue
 
 import (

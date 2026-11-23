@@ -134,6 +134,13 @@ describe('the materials page', () => {
     await expect.element(page.getByText('No history yet')).toBeInTheDocument();
   });
 
+  it('credits Prusa Connect, as its licence asks', async () => {
+    await draw(started(listing([row('a')])));
+    await expect
+      .element(page.getByText('Built on Prusa Connect by Prusa Research'))
+      .toBeInTheDocument();
+  });
+
   it('narrows the list to a material from its tile, and lets go on a second press', async () => {
     const stub = started(listing([row('a')]));
     await draw(stub);

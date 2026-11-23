@@ -451,5 +451,6 @@
   "materials.overview.none": "Nothing in stock",
   "materials.overview.inventoryTitle": "Material inventory",
   "materials.overview.tile": "{spools, plural, one {# spool} other {# spools}} · {weight}",
-  "materials.overview.byType": "Remaining by filament type"
+  "materials.overview.byType": "Remaining by filament type",
+  "materials.page.credit": "Built on Prusa Connect by Prusa Research"
 }

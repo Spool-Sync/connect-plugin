@@ -228,6 +228,11 @@
     </CardContent>
   </Card>
   <OverviewPanel part="bottom" {overview} />
+
+  <!-- The credit the licence (OCL SWAtt v1) asks a derivative to show its users. -->
+  <p data-part="credit" class="text-center text-xs text-muted-foreground">
+    {t('materials.page.credit')}
+  </p>
 </section>
 
 <AddDialog

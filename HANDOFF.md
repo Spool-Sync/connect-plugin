@@ -93,7 +93,7 @@ yet. In short:
   printer's telemetry, spool by `material_package_instance/uuid`;
 - untagged tool: a person assigns a SpoolSync spool in the printer's Spools
   tab; count down from `odometer_e`/`odometer_weight` (copy Materials'
-  `internal/consume`, MIT);
+  `internal/consume`, OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1);
 - own SQLite DB (assignments, last odometer readings, pending grams);
 - UI bundle (Svelte 5, `@prusa/connect-ui@0.1.0-beta.1` from npm): Spools
   page, spool page, Catalogue (SpoolSync filament types), printer Spools tab;
