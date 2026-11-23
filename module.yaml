@@ -8,8 +8,8 @@
 #
 # The namespace is absent on purpose. The host derives it from the repository
 # address the operator installed, so no module can name another module's
-# address. Published on the marketplace it is com.spool-sync.aux.connect
-# (spool-sync.com/connect); the Honex install keeps
+# address. Published on the marketplace it is com.github.aux.spool-sync.connect
+# (github.com/spool-sync/connect); the Honex install keeps
 # life.honex.gitlab.aux.spoolsync.spool-sync-prusa-connect.
 
 name: spool-sync-prusa-connect

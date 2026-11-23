@@ -7,7 +7,7 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"spool-sync.com/connect/internal/local"
+	"github.com/spool-sync/connect/internal/local"
 )
 
 // standaloneRigs makes newRig keep the inventory in the module's own database.

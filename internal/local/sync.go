@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"spool-sync.com/connect/internal/catalogue"
-	"spool-sync.com/connect/internal/spoolsync"
+	"github.com/spool-sync/connect/internal/catalogue"
+	"github.com/spool-sync/connect/internal/spoolsync"
 )
 
 // importTimeout bounds one catalogue import: the download and the writes.

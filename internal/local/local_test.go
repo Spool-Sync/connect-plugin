@@ -17,9 +17,9 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"spool-sync.com/connect/internal/catalogue"
-	"spool-sync.com/connect/internal/spoolsync"
-	"spool-sync.com/connect/internal/store"
+	"github.com/spool-sync/connect/internal/catalogue"
+	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect/internal/store"
 )
 
 // postgresDSN names a Postgres server the tests may create databases on, as the

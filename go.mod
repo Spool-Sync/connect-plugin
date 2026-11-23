@@ -1,4 +1,4 @@
-module spool-sync.com/connect
+module github.com/spool-sync/connect
 
 go 1.26.11
 

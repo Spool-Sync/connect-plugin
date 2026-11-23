@@ -5,7 +5,7 @@
 This project is maintained on GitLab:
 **https://gitlab.honex.life/spoolsync/spool-sync-prusa-connect**
 
-The GitHub repository, https://github.com/Spool-Sync/spool-sync-prusa-connect,
+The GitHub repository, https://github.com/Spool-Sync/connect,
 is a read-only mirror. GitLab pushes every branch and tag to it, so anything
 committed on GitHub directly is overwritten by the next push. Please open
 issues and merge requests on GitLab. A pull request opened on GitHub is not

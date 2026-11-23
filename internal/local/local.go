@@ -23,8 +23,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"spool-sync.com/connect/internal/catalogue"
-	"spool-sync.com/connect/internal/spoolsync"
+	"github.com/spool-sync/connect/internal/catalogue"
+	"github.com/spool-sync/connect/internal/spoolsync"
 )
 
 // maxTypePage is the most filament types one page answers, as SpoolSync's.

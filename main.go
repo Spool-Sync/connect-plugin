@@ -50,10 +50,10 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/wire"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"spool-sync.com/connect/internal/follower"
-	"spool-sync.com/connect/internal/local"
-	"spool-sync.com/connect/internal/spoolsync"
-	"spool-sync.com/connect/internal/store"
+	"github.com/spool-sync/connect/internal/follower"
+	"github.com/spool-sync/connect/internal/local"
+	"github.com/spool-sync/connect/internal/spoolsync"
+	"github.com/spool-sync/connect/internal/store"
 )
 
 // name is what this child reports when the host asks it what it is. The name is
