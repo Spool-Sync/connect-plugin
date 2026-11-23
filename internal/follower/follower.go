@@ -543,6 +543,18 @@ func (f *Follower) Refresh(ctx context.Context, printerID string) {
 	f.applyLocked(ctx, printerID)
 }
 
+// KnownGross answers the gross weight the follower last knew of a spool, and
+// false for one it has not read. It is what tells a weight this module wrote to
+// SpoolSync from one a person corrected there.
+func (f *Follower) KnownGross(spoolID string) (float64, bool) {
+	f.work.Lock()
+	defer f.work.Unlock()
+
+	sp, ok := f.spools[spoolID]
+
+	return sp.GrossG, ok
+}
+
 // SpoolChanged forgets the weight the follower last knew of a spool, because
 // someone set it in SpoolSync directly. The next write is compared with the
 // weight SpoolSync holds.

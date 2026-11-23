@@ -849,6 +849,10 @@ type PrinterReport struct {
 	ActiveTool *int         `json:"activeTool"`
 	Job        *JobReport   `json:"job"`
 	Slots      []SlotReport `json:"slots"`
+	// ReportedAt is the instant of the SpoolSync state this report is based
+	// on: the latest snapshot the module adopted. A slot SpoolSync changed
+	// after it is newer than the report and is not overwritten by it.
+	ReportedAt *time.Time `json:"reportedAt,omitempty"`
 }
 
 // JobReport is the print a printer runs.

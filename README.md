@@ -30,6 +30,11 @@ namespace. The browser half (`ui/`) draws the same pages.
 - **Writes SpoolSync at most once per whole gram**, as the gross weight: filament
   left plus the empty spool. Grams counted from an odometer wait in the module's
   database until a whole gram is due, and at the end of a job.
+- **Follows SpoolSync's side too.** A person may assign a spool to a printer's
+  slot, clear one, or correct a spool's weight in SpoolSync's own UI. SpoolSync
+  sends that state over an authenticated WebSocket, and the module adopts it on
+  its tool, so the printer's Tools tab and the countdown agree. The later of
+  the two changes wins, so assigning in either UI is not undone by the other.
 - **Assigns and unassigns** through the Materials rules: a printing printer
   refuses a change, a tool that reads a tag refuses an assignment, an empty tool
   refuses one, an offline printer accepts. A person must be allowed to `operate`
@@ -78,7 +83,8 @@ The SpoolSync token needs every one of these:
 `spools:view`, `spools:create`, `spools:edit`, `spools:delete`,
 `filament_types:view`, `filament_types:create`, `filament_types:edit`,
 `filament_types:delete`, `storage:view`, `storage:create`, `storage:edit`,
-`storage:delete`.
+`storage:delete`, `printers:view` (to report printers and follow the slot/load
+feed) and `printers:edit` (to report them).
 
 Creating a token with fewer makes the matching routes answer
 `spool-sync/SPOOLSYNC_REFUSED`.

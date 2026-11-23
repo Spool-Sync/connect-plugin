@@ -90,7 +90,7 @@ func (s *service) printerReports() []spoolsync.PrinterReport {
 
 		r := spoolsync.PrinterReport{
 			ConnectID: p.ID, Name: p.Name, Serial: p.Serial, Model: p.Model,
-			Status: statusOf(p), ActiveTool: active, Slots: slots,
+			Status: statusOf(p), ActiveTool: active, Slots: slots, ReportedAt: s.reportedAt(),
 		}
 
 		if p.Job != nil && (p.State == "PRINTING" || p.State == "PAUSED") {
@@ -123,24 +123,13 @@ func statusOf(p follower.Printer) string {
 // active one. A printer with an MMU has its slots (0.0, 0.1, ...) numbered
 // from 0; one without has its heads (0, 1, ...), as an XL does.
 func slotsOf(entries []follower.ToolEntry) (slots []spoolsync.SlotReport, active *int) {
-	feeder := false
-
-	for _, e := range entries {
-		if !e.Tool.ID.IsHead() {
-			feeder = true
-		}
-	}
+	feeder := hasFeeder(entries)
 
 	slots = []spoolsync.SlotReport{}
 
 	for _, e := range entries {
-		id := string(e.Tool.ID)
-		if e.Tool.ID.IsHead() == feeder {
-			continue
-		}
-
-		n, err := strconv.Atoi(id[strings.LastIndex(id, ".")+1:])
-		if err != nil {
+		n, ok := slotIndex(e, feeder)
+		if !ok {
 			continue
 		}
 
@@ -157,4 +146,12 @@ func slotsOf(entries []follower.ToolEntry) (slots []spoolsync.SlotReport, active
 	}
 
 	return slots, active
+}
+
+// parseSlot reads the slot number of a tool id: the part after the last dot,
+// so 0 on a head and 2 on an MMU's 0.2.
+func parseSlot(id string) (int, bool) {
+	n, err := strconv.Atoi(id[strings.LastIndex(id, ".")+1:])
+
+	return n, err == nil
 }

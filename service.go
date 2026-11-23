@@ -65,6 +65,12 @@ type service struct {
 
 	// mirrorKick asks runMirror for a report now.
 	mirrorKick chan struct{}
+
+	// syncMu guards what runSyncBack learns from SpoolSync: the instant of the
+	// last snapshot, and the weight it last saw of each spool.
+	syncMu  sync.Mutex
+	syncAt  time.Time
+	weights map[string]float64
 }
 
 type operateKey struct{ person, action, device string }
@@ -257,6 +263,7 @@ func newService(ss inventory, st *store.Store, log *slog.Logger, maxSpools int,
 	return &service{
 		ss: ss, st: st, log: log, maxSpools: maxSpools, access: access, emit: emit,
 		operates: map[operateKey]operateAnswer{}, mirrorKick: make(chan struct{}, 1),
+		weights: map[string]float64{},
 	}
 }
 

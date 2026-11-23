@@ -230,6 +230,7 @@ func methods(mod *module, conn *wirerpc.Conn) wirerpc.Methods {
 
 				mod.swap(db, svc.routes(), func(ctx context.Context) {
 					go svc.runMirror(ctx)
+					go svc.runSyncBack(ctx)
 					go svc.firstCatalogue(ctx)
 
 					_ = fo.Run(ctx)

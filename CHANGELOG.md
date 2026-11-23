@@ -3,6 +3,17 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
+## Unreleased
+
+### Added
+
+- **Two-way tools**: a spool assigned to a printer's slot, cleared, or a weight
+  corrected in SpoolSync's own UI now reaches the module. SpoolSync sends it
+  over an authenticated WebSocket feed, and the module adopts it on its tool.
+  The later of the two changes wins, so assigning in either UI is not undone
+  by the other. The feed needs `printers:view` on the SpoolSync token; a
+  SpoolSync without the feed is followed by polling the same snapshot.
+
 ## 0.1.0 - 2026-11-23
 
 The first release: SpoolSync in Prusa Connect, as a full replacement for the
