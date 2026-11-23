@@ -148,7 +148,7 @@
     {/snippet}
   </PageHeader>
 
-  <OverviewPanel part="top" {overview} />
+  <OverviewPanel part="top" {overview} selected={list.query.type} onpick={pick} />
 
   {#if list.mayOnlyRead}
     <p data-part="viewer" class="text-sm text-muted-foreground">
@@ -227,7 +227,7 @@
       </div>
     </CardContent>
   </Card>
-  <OverviewPanel part="bottom" {overview} selected={list.query.type} onpick={pick} />
+  <OverviewPanel part="bottom" {overview} />
 </section>
 
 <AddDialog

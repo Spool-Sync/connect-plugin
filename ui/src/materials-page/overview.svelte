@@ -1,10 +1,10 @@
 <!--
   The stock at a glance: SpoolSync's dashboard without its printer cards,
   reorder alerts and recently added spools. The top part, above the list, is
-  the totals, the filament over the last 30 days and the share of each
-  material; every box there has a fixed height, so the list below never moves
-  when the numbers land. The bottom part, under the list, is a tile per
-  material and the filament left of each filament type.
+  the totals, the filament over the last 30 days, the share of each material
+  and a tile per material; every box there has a fixed height, so the list
+  below never moves when the numbers land. The bottom part, under the list,
+  is the filament left of each filament type.
 
   A tile narrows the list to its material. The overview reads again whenever
   the list does, so a spool added or used shows in both.
@@ -175,19 +175,23 @@
     </Card>
   </div>
 
-  {/if}
 
-  {#if part === 'bottom' && overview !== undefined && overview.by_material.length > 0}
-    <Card>
-      <CardHeader><CardTitle>{t('materials.overview.inventoryTitle')}</CardTitle></CardHeader>
-      <CardContent>
-        <div class="grid grid-cols-2 gap-3 @md:grid-cols-3 @3xl:grid-cols-6">
+  <Card>
+    <CardHeader><CardTitle>{t('materials.overview.inventoryTitle')}</CardTitle></CardHeader>
+    <CardContent class="h-36">
+      {#if overview === undefined}
+        <Skeleton class="h-full" />
+      {:else if overview.by_material.length === 0}
+        <p class="py-8 text-center text-sm text-muted-foreground">{t('materials.overview.none')}</p>
+      {:else}
+        <!-- One row that scrolls sideways, so more materials never push the list down. -->
+        <div class="flex h-full gap-3 overflow-x-auto pb-1">
           {#each overview.by_material as m (m.material)}
             <button
               type="button"
               aria-pressed={selected === m.material}
               class={[
-                'flex flex-col items-start gap-1 rounded-card border p-3 text-left transition-colors',
+                'flex w-40 shrink-0 flex-col items-start gap-1 rounded-card border p-3 text-left transition-colors',
                 'hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring',
                 selected === m.material ? 'border-primary bg-muted' : 'border-border',
               ]}
@@ -200,7 +204,7 @@
               <span class="text-xs text-muted-foreground">
                 {t('materials.overview.tile', { spools: m.spools, weight: weight(m.grams) })}
               </span>
-              <span class="flex flex-wrap gap-1">
+              <span class="flex flex-wrap gap-1 overflow-hidden">
                 {#each m.colours as hex (hex)}
                   <span
                     class="inline-block size-3 rounded-full border border-black/15"
@@ -211,9 +215,12 @@
             </button>
           {/each}
         </div>
-      </CardContent>
-    </Card>
+      {/if}
+    </CardContent>
+  </Card>
+  {/if}
 
+  {#if part === 'bottom' && overview !== undefined && overview.by_material.length > 0}
     <Card>
       <CardHeader><CardTitle>{t('materials.overview.byType')}</CardTitle></CardHeader>
       <CardContent>
