@@ -850,7 +850,8 @@ func toolRowOf(p follower.Printer, e follower.ToolEntry, spools map[string]spool
 		row.MaterialUUID = sp.FilamentTypeID
 		row.MaterialName, row.BrandName = sp.Filament.Name, sp.Filament.Brand
 		row.Type, row.ColorRGBA = sp.Filament.Material, colourRGBA(sp.Filament.Color)
-		remaining, full := sp.RemainingG, sp.InitialG
+		// The full weight is the full spool's, the spool included, as Materials' is.
+		remaining, full := sp.RemainingG, sp.InitialG+sp.EmptyG
 		row.RemainingWeightG, row.FullWeightG = &remaining, &full
 
 		if sp.OptInstanceUUID != nil {

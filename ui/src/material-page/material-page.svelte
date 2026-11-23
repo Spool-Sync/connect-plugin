@@ -378,9 +378,14 @@
     fault = undefined;
     const copied = await attempt(async () => {
       // A field the spool lacks is left out of the draft, not set undefined.
+      // A spool answers the full spool's weight; adding one takes the filament
+      // it held new, so the empty spool comes off once here.
       const kept = {
         material_uuid: spool.material_uuid,
-        full_weight_g: spool.full_weight_g,
+        full_weight_g:
+          spool.full_weight_g === undefined
+            ? undefined
+            : spool.full_weight_g - (spool.empty_weight_g ?? 0),
         empty_weight_g: spool.empty_weight_g,
         remaining_weight_g: spool.remaining_weight_g,
         notes: spool.notes,

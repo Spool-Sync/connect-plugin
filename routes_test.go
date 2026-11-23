@@ -764,8 +764,13 @@ func TestAddReportedAsksForTheWeightATagLacks(t *testing.T) {
 	}
 
 	got := decode(t, rec)
-	if got["remaining_weight_g"] != 640.0 || got["full_weight_g"] != 640.0 || got["uuid"] != uuid {
-		t.Fatalf("the spool is %v, want 640 g left of 640 g, with the tag's uuid", got)
+	// full_weight_g is the full spool's, as Materials' is: the filament it held
+	// new and the empty spool, so a UI takes empty_weight_g off it once.
+	full, _ := got["full_weight_g"].(float64)
+	empty, _ := got["empty_weight_g"].(float64)
+
+	if got["remaining_weight_g"] != 640.0 || full-empty != 640.0 || got["uuid"] != uuid {
+		t.Fatalf("the spool is %v, want 640 g left of a spool that held 640 g, with the tag's uuid", got)
 	}
 }
 

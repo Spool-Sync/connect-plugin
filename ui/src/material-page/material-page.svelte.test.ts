@@ -438,11 +438,14 @@ describe('the material page', () => {
       standard({
         [`${M}/spools`]: [{ status: 201, body: { added: 1 } }],
         [`${M}/materials/a/spools`]: [
-          { status: 200, body: { spools: [spool(1), spool(2)], total: 2 } },
+          {
+            status: 200,
+            body: { spools: [spool(1, { empty_weight_g: 200 }), spool(2)], total: 2 },
+          },
           {
             status: 200,
             body: {
-              spools: [spool(1), spool(2), spool(3, { notes: 'note 1' })],
+              spools: [spool(1, { empty_weight_g: 200 }), spool(2), spool(3, { notes: 'note 1' })],
               total: 3,
             },
           },
@@ -459,10 +462,12 @@ describe('the material page', () => {
     await expect
       .element(page.getByRole('button', { name: 'Edit spool 3' }))
       .toBeVisible();
+    // The spool's full weight is the full spool's; the copy sends the filament.
     const sent = stub.calls.find((c) => c.method === 'POST')!;
     expect(JSON.parse(sent.body!)).toEqual({
       material_uuid: 'a',
-      full_weight_g: 1000,
+      full_weight_g: 800,
+      empty_weight_g: 200,
       remaining_weight_g: 400,
       notes: 'note 1',
       quantity: 1,
