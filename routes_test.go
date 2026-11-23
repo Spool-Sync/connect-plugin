@@ -26,9 +26,9 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/routesapi"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
+	"spool-sync.com/connect/internal/follower"
+	"spool-sync.com/connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/store"
 )
 
 // fakeSS is SpoolSync, held in memory, for the routes this module calls.

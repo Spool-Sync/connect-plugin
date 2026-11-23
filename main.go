@@ -34,8 +34,8 @@ import (
 	"maps"
 	"net/http"
 	"os"
-	"strings"
 	"os/signal"
+	"strings"
 	"sync"
 
 	// The two drivers the database may need. sdk/moduledb imports none.
@@ -50,10 +50,10 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/wire"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/local"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
+	"spool-sync.com/connect/internal/follower"
+	"spool-sync.com/connect/internal/local"
+	"spool-sync.com/connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/store"
 )
 
 // name is what this child reports when the host asks it what it is. The name is

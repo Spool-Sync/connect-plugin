@@ -19,8 +19,8 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/event"
 	"github.com/prusa3d/prusa-connect/sdk/wirerpc"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
+	"spool-sync.com/connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/store"
 )
 
 // metre is what 1000 mm of 1.75 mm PLA weighs at 1.24 g/cm³.

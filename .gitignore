@@ -5,3 +5,4 @@
 # The UI bundle: its packages and its build.
 /ui/node_modules/
 /ui/dist/
+/marketplace-bundle/

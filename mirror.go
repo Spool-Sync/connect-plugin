@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/follower"
+	"spool-sync.com/connect/internal/spoolsync"
 )
 
 // mirrorEvery is how often the printers are reported to SpoolSync when no

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/spoolsync"
 )
 
 // usageDays is how far back the usage chart reaches, SpoolSync's dashboard's own span.

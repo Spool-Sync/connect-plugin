@@ -5,14 +5,29 @@ first. `version:` in `module.yaml` is the newest heading below.
 
 ## 0.1.0 - unreleased
 
+The first release: SpoolSync in Prusa Connect, as a full replacement for the
+Materials extension.
+
 ### Added
 
-- Every spool a Prusa printer read off its OpenPrintTag NFC tag has its weight
-  set in SpoolSync, on the spool with the same instance UUID. The weight sent
-  is the filament left in Materials plus the empty spool weight of the SpoolSync
-  filament type, and it is sent once per whole gram. All spools are read again
-  at start, when the event stream loses continuity, and every 15 minutes.
-- The settings `spoolsync_url` and `spoolsync_token` name the SpoolSync server
-  and its API token. `materials_module` names the Materials module to follow.
-- `GET /status` answers whether the module is configured, and how many spools
-  it pushed, how many SpoolSync does not hold, and the last failure.
+- **The SpoolSync page** (`/spoolsync`): your inventory at a glance (spools in
+  stock, kilograms, materials, the filament used over 30 days, the share of
+  each material, a tile per material and the filament left of each type),
+  above a searchable list of the materials in stock.
+- **Spools and materials**: add spools of a catalogue or custom material, edit,
+  archive, merge and delete them, keep them in storage locations, star
+  favourite materials. The OpenPrintTag catalogue is imported for picking a
+  material.
+- **The printer's Tools tab**: what is on each tool and MMU slot. Assign a
+  spool, create one on the spot, change or unassign it. A spool the printer
+  read off an OpenPrintTag NFC tag is added in one step, asking for its weight
+  only when neither the tag nor the catalogue knows it, and linked to its
+  catalogue material.
+- **Weights kept in step**: while a printer prints, the filament it feeds is
+  counted off the spool on each tool, from the tag's consumed weight or from
+  the tool's odometer, and written once per whole gram.
+- **Two ways to run**: with a SpoolSync server (`spoolsync_url` and
+  `spoolsync_token`), where SpoolSync keeps the inventory and also sees each
+  printer, its job and the spool in each slot; or **standalone**, with both
+  left empty, where the module keeps the inventory in its own database and
+  imports the catalogue itself.

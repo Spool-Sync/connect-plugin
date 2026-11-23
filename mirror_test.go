@@ -5,7 +5,7 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/connectorapi"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
+	"spool-sync.com/connect/internal/follower"
 )
 
 func entry(id string, spool string, active bool) follower.ToolEntry {

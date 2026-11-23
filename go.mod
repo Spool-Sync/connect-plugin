@@ -1,4 +1,4 @@
-module gitlab.honex.life/spoolsync/spool-sync-prusa-connect
+module spool-sync.com/connect
 
 go 1.26.11
 

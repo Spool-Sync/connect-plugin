@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/spoolsync"
 )
 
 // inventory is where the spools, filament types and locations are kept: a

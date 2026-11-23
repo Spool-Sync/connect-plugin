@@ -35,9 +35,9 @@ import (
 	"github.com/prusa3d/prusa-connect/sdk/deviceapi"
 	"github.com/prusa3d/prusa-connect/sdk/event"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/consume"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
+	"spool-sync.com/connect/internal/consume"
+	"spool-sync.com/connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/store"
 )
 
 // statePath is where a device keeps the value of its state machine.

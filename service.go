@@ -16,9 +16,9 @@ import (
 
 	"github.com/prusa3d/prusa-connect/sdk/accessapi"
 	"github.com/prusa3d/prusa-connect/sdk/connectorapi"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/follower"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/store"
+	"spool-sync.com/connect/internal/follower"
+	"spool-sync.com/connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/store"
 )
 
 // The events module.yaml declares under events, and the types they make.

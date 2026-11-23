@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/catalogue"
-	"gitlab.honex.life/spoolsync/spool-sync-prusa-connect/internal/spoolsync"
+	"spool-sync.com/connect/internal/catalogue"
+	"spool-sync.com/connect/internal/spoolsync"
 )
 
 // importTimeout bounds one catalogue import: the download and the writes.

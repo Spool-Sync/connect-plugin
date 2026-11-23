@@ -1,0 +1,28 @@
+name: Marketplace check
+
+# Every push to main runs the marketplace's builder as a dry run: it builds,
+# checks and signs with a throwaway key, and uploads nothing. A release the
+# marketplace would refuse fails here, not when it is tagged.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    uses: prusa3d/prusa-connect-marketplace-publish/.github/workflows/publish.yml@v1
+    with:
+      path: .
+      module: spool-sync.com/connect
+      node-version: '26'
+      bundle-command: sh scripts/marketplace-bundle.sh
+      bundle-output: marketplace-bundle
+      check-version: false
+      dry-run: true
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write

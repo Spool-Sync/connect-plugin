@@ -120,6 +120,22 @@ server; the test creates and drops its own database on it.
 It builds against `github.com/prusa3d/prusa-connect/sdk` at the version in
 `go.mod`.
 
+## Install
+
+From the Prusa Plugin Marketplace, as `com.spool-sync.aux.connect` (module
+path `spool-sync.com/connect`), once a release is approved there.
+
+## Releasing to the marketplace
+
+A tag `v<version>` (the version in `module.yaml`, whose heading in
+`CHANGELOG.md` gives the release notes) pushed on GitLab is mirrored to
+GitHub, where `.github/workflows/release.yml` hands the commit to the
+marketplace's builder. It builds every platform and the bundle
+(`scripts/marketplace-bundle.sh`), signs the release with the key in the
+GitHub environment `release` (secret `PRUSA_CONNECT_EXTENSION_SIGNING_KEY`)
+and uploads it for review. `.github/workflows/marketplace-check.yml` runs the
+same build as a dry run on every push to main.
+
 ## Release and install
 
 `sh scripts/release.sh` builds `dist/spool-sync-prusa-connect-<version>.tar.gz`,
