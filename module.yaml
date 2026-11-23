@@ -25,8 +25,8 @@ license: OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1
 # them into the declaration, so `GET /api/v1/resources` carries them for an
 # installed module. Write your own sentence here, a title if the name alone reads badly, and your name or
 # your team's beside it.
-title: SpoolSync
-summary: Your SpoolSync spools in Prusa Connect, with the weight on each printer tool kept in step.
+title: Spool-Sync
+summary: Simple, local-first filament management. Use it standalone, or unlock its full potential by connecting it to your Spool-Sync instance.
 codeowner: SpoolSync
 # The module wire major the process half speaks.
 contract_major: 1
