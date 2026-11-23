@@ -3,7 +3,7 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
-## 0.1.0 - unreleased
+## 0.1.0 - 2026-11-23
 
 The first release: SpoolSync in Prusa Connect, as a full replacement for the
 Materials extension.
