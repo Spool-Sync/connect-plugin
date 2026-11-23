@@ -663,6 +663,51 @@ describe('the material section', () => {
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('asks before taking a spool loaded on another printer, naming it', async () => {
+    const stub = started({
+      [TOOLS]: [printer([tool('0')])],
+      [`${TOOLS}/0`]: [{ status: 200, body: assignment({ spool_id: '8' }) }],
+      [`${M}/spools`]: [
+        {
+          status: 200,
+          body: {
+            spools: [
+              spool(8, {
+                material_name: 'PLA b',
+                tool: { device_id: 'xl', tool_id: '1', gone: false },
+              }),
+            ],
+            total: 1,
+          },
+        },
+      ],
+      [`${M}/printers`]: [
+        {
+          status: 200,
+          body: {
+            printers: [
+              { id: 'xl', name: 'Big XL', model: 'XL', connected: true, state: 'IDLE', may_operate: true },
+            ],
+            total: 1,
+          },
+        },
+      ],
+    });
+    await draw(stub);
+
+    await page.getByRole('button', { name: 'Assign' }).click();
+    const picker = page.getByRole('dialog');
+    await picker.getByRole('button', { name: /Prusament PLA b/ }).click();
+
+    const question = page.getByRole('alertdialog');
+    await expect.element(question.getByText('This spool is already loaded')).toBeVisible();
+    await expect.element(question.getByText(/Big XL/)).toBeVisible();
+    await question.getByRole('button', { name: 'Use this spool' }).click();
+
+    await page.getByRole('button', { name: 'Load', exact: true }).click();
+    await expect.poll(() => sent(stub, 'PUT')).toEqual([{ spool_id: '8' }]);
+  });
+
   it('says Replace when the tool already holds a spool', async () => {
     const stub = started({
       [TOOLS]: [

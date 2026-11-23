@@ -35,11 +35,12 @@ const draw = async (
   spools: readonly Spool[],
   selected?: string,
   material?: string,
+  colour?: string,
 ) => {
   const onselect = vi.fn<(id: string | undefined) => void>();
   const stub = stubHost([{ status: 200, body: {} }]);
   void setup(stub.host);
-  await render(SpoolPicker, { spools, selected, onselect, material });
+  await render(SpoolPicker, { spools, selected, onselect, material, colour });
 
   return { onselect };
 };
@@ -67,6 +68,36 @@ describe('the spool picker', () => {
     await expect
       .element(page.getByText('the printer reports PLA on this tool', { exact: false }))
       .toBeVisible();
+  });
+
+  it('lists the spools nearest the reported colour first, one loaded elsewhere last and greyed out', async () => {
+    await draw(
+      [
+        spool('red', { material_name: 'Red', color_rgba: '#d32f2fff' }),
+        spool('onTool', {
+          material_name: 'Sky',
+          color_rgba: '#1e88e5ff',
+          tool: { device_id: 'core', tool_id: '0', gone: false },
+        }),
+        spool('navy', { material_name: 'Navy', color_rgba: '#1a237eff' }),
+        spool('green', { material_name: 'Green', color_rgba: '#2e7d32ff' }),
+      ],
+      undefined,
+      undefined,
+      '#1565c0ff',
+    );
+
+    await expect.element(page.getByRole('button', { name: /Navy/ })).toBeVisible();
+    const rows = [...document.querySelectorAll('[data-part="spool-row"]')].map(
+      (row) => row.getAttribute('data-spool'),
+    );
+    expect(rows).toEqual(['navy', 'green', 'red', 'onTool']);
+    const onTool = document.querySelector('[data-spool="onTool"]')!;
+    expect(onTool.hasAttribute('data-elsewhere')).toBe(true);
+    expect(onTool.className).toContain('opacity-50');
+    expect(
+      document.querySelector('[data-spool="navy"]')!.hasAttribute('data-elsewhere'),
+    ).toBe(false);
   });
 
   it('says no spool of the reported material is there', async () => {

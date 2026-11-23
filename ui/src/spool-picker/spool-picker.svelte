@@ -6,7 +6,8 @@
 
   With `material`, the material a printer reports on the tool, only spools of
   that material are offered and the material-type chips are left out: the
-  printer already says which it holds.
+  printer already says which it holds. With `colour`, the colour the printer
+  reports, the list is the spools nearest that colour first.
 
   Spools on a tool come after the rest: a spool a printer already holds is the
   one a person means least often. The picker keeps no choice of its own; the
@@ -21,6 +22,7 @@
 
   import type { Spool } from '../api';
   import { cssColour } from '../css-colour';
+  import { byColour } from './colour-distance';
   import { heldHost } from '../host';
   import { sameMaterial } from '../printer-material/material-match';
   import { toolLabel } from '../printer-material/tool-label';
@@ -28,6 +30,8 @@
   let {
     spools: every,
     material,
+    colour: target,
+    here,
     selected,
     onselect,
   }: {
@@ -35,6 +39,10 @@
     spools: readonly Spool[];
     /** The material the printer reports on the tool; only its spools are offered. */
     material?: string | undefined;
+    /** The tool's colour, #rrggbb or #rrggbbaa; the nearest spools come first. */
+    colour?: string | undefined;
+    /** The tool the spool goes on. A spool on any other tool is greyed out. */
+    here?: { device_id: string; tool_id: string } | undefined;
     /** The chosen spool's id, undefined when none is chosen. */
     selected: string | undefined;
     /** The id picked, or undefined when the chosen row was picked again. */
@@ -95,11 +103,25 @@
         .includes(needle);
     });
 
+    // Nearest the reported colour first, when the printer reports one. A spool
+    // loaded on another tool goes after every free one either way.
+    const ordered = byColour(matching, target, (s) => s.color_rgba);
+
     return [
-      ...matching.filter((s) => s.tool == null),
-      ...matching.filter((s) => s.tool != null),
+      ...ordered.filter((s) => !elsewhere(s)),
+      ...ordered.filter((s) => elsewhere(s)),
     ];
   });
+
+  /** Whether the spool is loaded on a tool other than the one it is picked for. */
+  function elsewhere(s: Spool): boolean {
+    return (
+      s.tool != null &&
+      (here === undefined ||
+        s.tool.device_id !== here.device_id ||
+        s.tool.tool_id !== here.tool_id)
+    );
+  }
 
   /** What a row says where the spool is: the tool it is on, or its location. */
   const where = (s: Spool): string | undefined => {
@@ -196,7 +218,9 @@
             class={[
               'flex w-full items-center gap-3 rounded-sm border p-2 text-start outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring',
               isSelected ? 'border-primary bg-primary/10' : 'border-border',
+              elsewhere(s) && !isSelected && 'opacity-50',
             ]}
+            data-elsewhere={elsewhere(s) ? '' : undefined}
             onclick={() => pick(s)}
           >
             <span

@@ -454,5 +454,8 @@
   "materials.overview.byType": "Remaining by filament type",
   "materials.page.credit": "Built on Prusa Connect by Prusa Research",
   "materials.spoolPicker.reported": "Showing {material} spools: the printer reports {material} on this tool.",
-  "materials.spoolPicker.noneOf": "No {material} spools available. Create one below."
+  "materials.spoolPicker.noneOf": "No {material} spools available. Create one below.",
+  "materials.assign.elsewhereTitle": "This spool is already loaded",
+  "materials.assign.elsewhere": "It is loaded on {tool} of {printer}. Are you sure you want to load it here?",
+  "materials.assign.elsewhereConfirm": "Use this spool"
 }

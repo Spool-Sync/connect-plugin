@@ -435,5 +435,8 @@
   "materials.overview.byType": "Zbývá podle typu filamentu",
   "materials.page.credit": "Postaveno na Prusa Connect od Prusa Research",
   "materials.spoolPicker.reported": "Zobrazeny cívky {material}: tiskárna hlásí na tomto nástroji {material}.",
-  "materials.spoolPicker.noneOf": "Žádné cívky {material}. Vytvořte novou níže."
+  "materials.spoolPicker.noneOf": "Žádné cívky {material}. Vytvořte novou níže.",
+  "materials.assign.elsewhereTitle": "Tato cívka je už zavedená",
+  "materials.assign.elsewhere": "Je zavedená v {tool} tiskárny {printer}. Opravdu ji chcete zavést sem?",
+  "materials.assign.elsewhereConfirm": "Použít tuto cívku"
 }
