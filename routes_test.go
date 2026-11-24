@@ -447,7 +447,10 @@ func newRig(t *testing.T, printer deviceapi.Device) *rig {
 func (r *rig) call(t *testing.T, method, path, body, by string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req, err := routesapi.Request{Method: method, Path: path, Body: []byte(body), Principal: by}.HTTP(r.ctx)
+	// The host hands the query apart from the path.
+	path, query, _ := strings.Cut(path, "?")
+
+	req, err := routesapi.Request{Method: method, Path: path, Query: query, Body: []byte(body), Principal: by}.HTTP(r.ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -867,5 +870,47 @@ func TestTheOverviewTotalsTheStockByMaterialAndType(t *testing.T) {
 
 	if _, ok := o["usage"].([]any); !ok {
 		t.Fatalf("the usage is %v, want a list even when SpoolSync has none", o["usage"])
+	}
+}
+
+func TestTheJobsAnswerTheFilamentEachPrintTook(t *testing.T) {
+	r := newRig(t, printerWith("IDLE", nil))
+	r.call(t, "POST", "/spools", `{"material_uuid":"ft1","remaining_weight_g":800,"quantity":1}`, "user:alpha")
+
+	spools := decode(t, r.call(t, "GET", "/spools", "", "user:alpha"))["spools"].([]any)
+	id := spools[0].(map[string]any)["id"].(string)
+
+	for _, use := range []struct {
+		tool  string
+		grams float64
+	}{{"0", 12}, {"0", 3.5}, {"1", 20}} {
+		if err := r.svc.st.AddJobUsage(t.Context(), "job-1", "p1", use.tool, id, use.grams); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	totals := decode(t, r.call(t, "GET", "/jobs/usage?id=job-1%2Cjob-2", "", "user:alpha"))["usage"].([]any)
+	if len(totals) != 1 || totals[0].(map[string]any)["grams"] != 35.5 {
+		t.Fatalf("the totals are %v, want job-1 at 35.5 g and no row for job-2", totals)
+	}
+
+	detail := decode(t, r.call(t, "GET", "/jobs/job-1/usage", "", "user:alpha"))
+	rows := detail["spools"].([]any)
+
+	if detail["grams"] != 35.5 || len(rows) != 2 {
+		t.Fatalf("the breakdown is %v, want 35.5 g over two tools", detail)
+	}
+
+	first := rows[0].(map[string]any)
+	if first["tool"] != "0" || first["grams"] != 15.5 || first["brand"] != "Prusament" || first["material"] != "PLA" {
+		t.Fatalf("the first row is %v, want tool 0, 15.5 g of Prusament PLA", first)
+	}
+
+	if again := decode(t, r.call(t, "GET", "/jobs/usage?id=job-2&id=job-1", "", "user:alpha"))["usage"].([]any); len(again) != 1 {
+		t.Fatalf("repeated ids answered %v, want job-1 alone", again)
+	}
+
+	if rec := r.call(t, "GET", "/jobs/job-9/usage", "", "user:alpha"); len(decode(t, rec)["spools"].([]any)) != 0 {
+		t.Fatalf("a print with nothing counted answered %s", rec.Body.String())
 	}
 }

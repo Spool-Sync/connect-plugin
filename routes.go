@@ -61,6 +61,8 @@ func (s *service) routes() http.Handler {
 	mux.HandleFunc("GET /list-filters", acting(s.getFilters))
 	mux.HandleFunc("PUT /list-filters", acting(s.putFilters))
 	mux.HandleFunc("GET /overview", acting(s.overview))
+	mux.HandleFunc("GET /jobs/usage", acting(s.jobsUsage))
+	mux.HandleFunc("GET /jobs/{id}/usage", acting(s.jobUsage))
 	mux.HandleFunc("GET /spools", acting(s.listSpools))
 	mux.HandleFunc("POST /spools", acting(s.addSpools))
 	mux.HandleFunc("PATCH /spools/{id}", acting(s.updateSpool))

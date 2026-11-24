@@ -714,3 +714,61 @@ func TestATagWithNoFullWeightChargesWhatItsCountRises(t *testing.T) {
 		t.Fatalf("writes %v, want [1097 1096] (0.4 pending + 1)", got)
 	}
 }
+
+// jobEnvelope is a job event of printer p1 for one print.
+func jobEnvelope(kind, jobID string) json.RawMessage {
+	data, _ := json.Marshal(map[string]any{"job_id": jobID, "device_job_id": "7"})
+	env, _ := json.Marshal(event.Envelope{Type: kind, Subject: "device:p1", Data: data})
+
+	return env
+}
+
+// A print is charged the grams its tools feed between its start and its end,
+// the last readings of the window it ends in included. Filament fed with no
+// print running is charged to none.
+func TestAPrintIsChargedTheFilamentItsToolsFed(t *testing.T) {
+	w := newWorld(t, []spoolsync.Spool{plaSpool("s1", 1100, "")}, printer("p1", merge(
+		head("0", odometerState(7, 0)),
+	)))
+
+	if err := w.store.SetAssignment(w.ctx, store.Assignment{PrinterID: "p1", Tool: "0", SpoolID: "s1", AssignedBy: "user:alpha"}); err != nil {
+		t.Fatal(err)
+	}
+
+	w.f.Refresh(w.ctx, "p1")
+
+	// Fed before the print: charged to the spool and to no print.
+	w.window(t, sample(connectorapi.ToolPath("0", connectorapi.OdometerE), 1000.0))
+
+	odometer := connectorapi.ToolPath("0", connectorapi.OdometerE)
+	steps := []busapi.Window{
+		{Events: []json.RawMessage{jobEnvelope(event.TypeDeviceJobStarted, "job-1")}},
+		{Telemetry: []json.RawMessage{sample(odometer, 2000.0)}},
+		// The last reading and the end of the print arrive in one window.
+		{
+			Telemetry: []json.RawMessage{sample(odometer, 3000.0)},
+			Events:    []json.RawMessage{jobEnvelope(event.TypeDeviceJobSettled, "job-1")},
+		},
+		// After the print ends, feeding charges no print.
+		{Telemetry: []json.RawMessage{sample(odometer, 4000.0)}},
+	}
+
+	for _, step := range steps {
+		if err := w.f.window(w.ctx, step); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	uses, err := w.store.JobUsage(w.ctx, []string{"job-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(uses) != 1 || uses[0].SpoolID != "s1" || uses[0].Tool != "0" || !approx(uses[0].Grams, 2*metre) {
+		t.Fatalf("the print took %+v, want 2 m of PLA (%v g) off s1 on tool 0", uses, 2*metre)
+	}
+
+	if _, running, _ := w.store.RunningJob(w.ctx, "p1"); running {
+		t.Fatal("the printer still holds a print after it settled")
+	}
+}

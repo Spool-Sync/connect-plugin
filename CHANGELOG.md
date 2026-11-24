@@ -3,6 +3,17 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
+## Unreleased
+
+### Added
+
+- **Filament per print**: the module counts the grams each print takes off
+  each spool, from the moment it starts following a print. The Jobs listing
+  shows a Filament column, and a print's page lists the spools it used, tool
+  by tool. This needs a Prusa Connect with the job slots
+  (prusa3d/prusa-connect#80); until a release has them, `go.mod` builds
+  against that pull request's SDK.
+
 ## 0.2.0 - 2026-11-23
 
 ### Added

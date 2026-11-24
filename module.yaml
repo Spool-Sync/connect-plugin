@@ -121,6 +121,15 @@ ui:
     device_tab:
       - id: tools
         title: Tools
+    # The filament each print took: a column in the Jobs listing, and the
+    # spool by spool breakdown on a print's page. These slots need a Prusa
+    # Connect with prusa3d/prusa-connect#80.
+    job_column:
+      - id: filament
+        title: Filament
+    job_section:
+      - id: filament
+        title: Filament used
 
 # The memory in MiB the server may budget for the process, children included.
 # needs:

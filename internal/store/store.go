@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 	"time"
 
 	// The two drivers the database may need. sdk/moduledb imports none.
@@ -254,7 +255,7 @@ func (s *Store) ForgetPrinter(ctx context.Context, printerID string) error {
 
 	defer func() { _ = tx.Rollback() }()
 
-	for _, table := range []string{"assignments", "odometers"} {
+	for _, table := range []string{"assignments", "odometers", "printer_jobs"} {
 		if _, err = tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE printer_id = $1`, printerID); err != nil {
 			return fmt.Errorf("forget printer %s: %w", printerID, err)
 		}
@@ -451,3 +452,96 @@ func (s *Store) SetListFilters(ctx context.Context, person, filters string) erro
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
+
+// StartJob holds the print running on a printer, replacing any before it.
+func (s *Store) StartJob(ctx context.Context, printerID, jobID string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO printer_jobs (printer_id, job_id) VALUES ($1, $2)
+		ON CONFLICT (printer_id) DO UPDATE SET job_id = excluded.job_id`, printerID, jobID)
+	if err != nil {
+		return fmt.Errorf("hold the print of %s: %w", printerID, err)
+	}
+
+	return nil
+}
+
+// EndJob lets go of a printer's print, when the one held is jobID.
+func (s *Store) EndJob(ctx context.Context, printerID, jobID string) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM printer_jobs WHERE printer_id = $1 AND job_id = $2`,
+		printerID, jobID); err != nil {
+		return fmt.Errorf("end the print of %s: %w", printerID, err)
+	}
+
+	return nil
+}
+
+// RunningJob answers the print a printer runs, and false for none.
+func (s *Store) RunningJob(ctx context.Context, printerID string) (string, bool, error) {
+	var job string
+
+	err := s.db.QueryRowContext(ctx, `SELECT job_id FROM printer_jobs WHERE printer_id = $1`, printerID).Scan(&job)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+
+	if err != nil {
+		return "", false, fmt.Errorf("read the print of %s: %w", printerID, err)
+	}
+
+	return job, true, nil
+}
+
+// AddJobUsage counts grams more that a print took off a spool on a tool.
+func (s *Store) AddJobUsage(ctx context.Context, jobID, printerID, tool, spoolID string, grams float64) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO job_usage (job_id, printer_id, tool, spool_id, grams)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (job_id, tool, spool_id) DO UPDATE SET grams = job_usage.grams + excluded.grams`,
+		jobID, printerID, tool, spoolID, grams)
+	if err != nil {
+		return fmt.Errorf("count the filament of print %s: %w", jobID, err)
+	}
+
+	return nil
+}
+
+// JobUse is the grams one print took off one spool on one tool.
+type JobUse struct {
+	JobID, PrinterID, Tool, SpoolID string
+	Grams                           float64
+}
+
+// JobUsage answers what the prints took, tool by tool and spool by spool, for
+// the prints named. A print with no row took nothing this module counted.
+func (s *Store) JobUsage(ctx context.Context, jobIDs []string) ([]JobUse, error) {
+	if len(jobIDs) == 0 {
+		return nil, nil
+	}
+
+	marks := make([]string, len(jobIDs))
+	args := make([]any, len(jobIDs))
+
+	for i, id := range jobIDs {
+		marks[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	rows, err := s.db.QueryContext(ctx, `SELECT job_id, printer_id, tool, spool_id, grams FROM job_usage
+		WHERE job_id IN (`+strings.Join(marks, ", ")+`) ORDER BY job_id, tool, spool_id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("read the filament of the prints: %w", err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var out []JobUse
+
+	for rows.Next() {
+		var u JobUse
+		if err := rows.Scan(&u.JobID, &u.PrinterID, &u.Tool, &u.SpoolID, &u.Grams); err != nil {
+			return nil, fmt.Errorf("read the filament of the prints: %w", err)
+		}
+
+		out = append(out, u)
+	}
+
+	return out, rows.Err()
+}

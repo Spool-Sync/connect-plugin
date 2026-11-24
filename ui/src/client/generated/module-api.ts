@@ -500,6 +500,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        JobTotal: {
+            job_id: string;
+            grams: number;
+        };
+        JobUsage: {
+            job_id: string;
+            /** @description The filament the print took, in grams. */
+            grams: number;
+            spools: {
+                /** @description The tool's id, such as 0 or 1.2 for a slot. */
+                tool: string;
+                spool_id: string;
+                /** @description Empty for a spool deleted since. */
+                name: string;
+                brand: string;
+                material: string;
+                color_rgba: string;
+                grams: number;
+            }[];
+        };
         Overview: {
             /** @description The spools in stock. */
             spools: number;
@@ -1527,6 +1547,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Spool"];
+                };
+            };
+            default: components["responses"]["Refused"];
+        };
+    };
+    "read-job-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The print's filament. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobUsage"];
+                };
+            };
+            default: components["responses"]["Refused"];
+        };
+    };
+    "read-jobs-usage": {
+        parameters: {
+            query?: {
+                /** @description A print's id. Repeat it for more prints. */
+                id?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The prints' filament. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        usage: components["schemas"]["JobTotal"][];
+                    };
                 };
             };
             default: components["responses"]["Refused"];

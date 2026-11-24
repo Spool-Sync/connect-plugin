@@ -220,6 +220,7 @@ var served = []string{
 	"GET /locations", "POST /locations", "PATCH /locations/{id}", "DELETE /locations/{id}",
 	"GET /list-filters", "PUT /list-filters",
 	"GET /overview",
+	"GET /jobs/usage", "GET /jobs/{id}/usage",
 	"GET /spools", "POST /spools", "PATCH /spools/{id}", "DELETE /spools/{id}", "POST /spools/delete",
 	"POST /spools/{id}/merge",
 	"GET /printers", "GET /printers/tools", "GET /printers/{device}/tools",

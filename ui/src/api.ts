@@ -54,6 +54,10 @@ export type SpoolsDraft = components['schemas']['SpoolsDraft'];
 export type Spool = components['schemas']['Spool'];
 /** The stock at a glance, for the dashboard. */
 export type Overview = components['schemas']['Overview'];
+/** The filament one print took, spool by spool. */
+export type JobUsage = components['schemas']['JobUsage'];
+/** The filament one print took, in all. */
+export type JobTotal = components['schemas']['JobTotal'];
 
 /** One page of a material's spools, and how many it has. */
 export type SpoolPage = components['schemas']['Spools'];
@@ -106,6 +110,10 @@ export type ListQuery = NonNullable<
 export interface MaterialsService {
   /** The stock at a glance: totals, by material, by type, and the usage chart. */
   overview(signal?: AbortSignal): Promise<Overview>;
+  /** The filament each print named took; a print with nothing counted is absent. */
+  jobsUsage(ids: readonly string[], signal?: AbortSignal): Promise<readonly JobTotal[]>;
+  /** The filament one print took, spool by spool. */
+  jobUsage(id: string, signal?: AbortSignal): Promise<JobUsage>;
   list(query: ListQuery, signal?: AbortSignal): Promise<Page>;
   star(uuid: string, on: boolean, signal?: AbortSignal): Promise<void>;
   brands(signal?: AbortSignal): Promise<readonly Brand[]>;
@@ -210,6 +218,10 @@ export const materialsOn = (host: ModuleHost): MaterialsService => {
 
   return {
     overview: async (signal) => await routes.readOverview({}, ended(signal)),
+    jobsUsage: async (ids, signal) =>
+      (await routes.readJobsUsage({ query: { id: [...ids] } }, ended(signal))).usage,
+    jobUsage: async (id, signal) =>
+      await routes.readJobUsage({ path: { id } }, ended(signal)),
     list: async (query, signal) =>
       await routes.listMaterials({ query }, ended(signal)),
     star: async (uuid, on, signal) => {

@@ -43,6 +43,7 @@ func TestStandalone(t *testing.T) {
 		"printer tools":                    TestPrinterToolsSayWhetherTheCallerMayOperate,
 		"add reported asks for the weight": TestAddReportedAsksForTheWeightATagLacks,
 		"the overview":                     TestTheOverviewTotalsTheStockByMaterialAndType,
+		"the jobs":                         TestTheJobsAnswerTheFilamentEachPrintTook,
 		"spools round trip":                testSpoolsRoundTrip,
 	}
 

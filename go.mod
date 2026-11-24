@@ -22,3 +22,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
+
+replace github.com/prusa3d/prusa-connect/sdk => github.com/DomiiBunn/prusa-connect/sdk v0.0.0-20261124013040-3c5637e8b129

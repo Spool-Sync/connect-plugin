@@ -457,5 +457,8 @@
   "materials.spoolPicker.noneOf": "No {material} spools available. Create one below.",
   "materials.assign.elsewhereTitle": "This spool is already loaded",
   "materials.assign.elsewhere": "It is loaded on {tool} of {printer}. Are you sure you want to load it here?",
-  "materials.assign.elsewhereConfirm": "Use this spool"
+  "materials.assign.elsewhereConfirm": "Use this spool",
+  "materials.job.none": "No filament was counted for this print. A print is counted only while this module follows the printer.",
+  "materials.job.gone": "A spool since deleted",
+  "materials.job.total": "In all"
 }

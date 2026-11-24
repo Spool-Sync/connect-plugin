@@ -219,6 +219,7 @@ func (f *Follower) Run(ctx context.Context) error {
 
 	params := busapi.SubscribeParams{Types: []string{
 		event.TypeDeviceTelemetrySampled, event.TypeDevicePresenceChanged, event.TypeDeviceRecordChanged,
+		event.TypeDeviceJobStarted, event.TypeDeviceJobSettled,
 	}}
 
 	for wait := firstRetry; ; {
@@ -399,7 +400,23 @@ func (f *Follower) window(ctx context.Context, w busapi.Window) error {
 
 	changed := f.samples(w.Telemetry)
 
+	// A print that ended in this window ends after its last readings are
+	// counted, so the grams they carry are still the print's.
+	var settled []jobEvent
+
 	for _, raw := range w.Events {
+		if job, ok := jobEventOf(raw); ok {
+			if job.started {
+				if err := f.store.StartJob(ctx, job.printerID, job.jobID); err != nil {
+					f.fail("hold the print of "+job.printerID, err)
+				}
+			} else {
+				settled = append(settled, job)
+			}
+
+			continue
+		}
+
 		id, ok := deviceOf(raw)
 		if !ok {
 			continue
@@ -439,6 +456,12 @@ func (f *Follower) window(ctx context.Context, w busapi.Window) error {
 
 	for _, id := range slices.Sorted(maps.Keys(changed)) {
 		f.applyLocked(ctx, id)
+	}
+
+	for _, job := range settled {
+		if err := f.store.EndJob(ctx, job.printerID, job.jobID); err != nil {
+			f.fail("end the print of "+job.printerID, err)
+		}
 	}
 
 	f.cursor = w.Cursor
@@ -520,6 +543,93 @@ func write(d *deviceapi.Device, path string, value json.RawMessage) {
 }
 
 // deviceOf reads the device id out of an envelope's subject, device:<id>.
+// jobEvent is a print starting or ending on a printer.
+type jobEvent struct {
+	printerID, jobID string
+	started          bool
+}
+
+// jobEventOf reads a job event: started or settled, the printer and the print.
+func jobEventOf(raw json.RawMessage) (jobEvent, bool) {
+	var envelope event.Envelope
+	if json.Unmarshal(raw, &envelope) != nil {
+		return jobEvent{}, false
+	}
+
+	started := envelope.Type == event.TypeDeviceJobStarted
+	if !started && envelope.Type != event.TypeDeviceJobSettled {
+		return jobEvent{}, false
+	}
+
+	origin, err := event.ParseOrigin(envelope.Subject)
+	if err != nil || origin.Kind() != event.KindDevice {
+		return jobEvent{}, false
+	}
+
+	var data struct {
+		JobID string `json:"job_id"`
+	}
+
+	if json.Unmarshal(envelope.Data, &data) != nil || data.JobID == "" {
+		return jobEvent{}, false
+	}
+
+	return jobEvent{printerID: origin.ID(), jobID: data.JobID, started: started}, true
+}
+
+// chargeJob counts grams a tool fed against the print the printer runs. A
+// printer with no print held, such as one that fed filament by hand, charges
+// none.
+func (f *Follower) chargeJob(ctx context.Context, printerID string, toolID connectorapi.ToolID, spoolID string, grams float64) {
+	if grams <= 0 {
+		return
+	}
+
+	job, running, err := f.store.RunningJob(ctx, printerID)
+	if err != nil {
+		f.fail("read the print of "+printerID, err)
+
+		return
+	}
+
+	if !running {
+		return
+	}
+
+	if err = f.store.AddJobUsage(ctx, job, printerID, string(toolID), spoolID, grams); err != nil {
+		f.fail("count the filament of print "+job, err)
+	}
+}
+
+// jobTagCounter keys the last consumed weight of a tag read for the prints,
+// apart from tagCounter, which the spool's own count keeps.
+const jobTagCounter = "tag-job"
+
+// chargeTag charges the rise of a tag's consumed weight since its last reading
+// to the print running. A first reading and a lower one charge nothing.
+func (f *Follower) chargeTag(ctx context.Context, printerID string, toolID connectorapi.ToolID, uuid string, consumed float64, spoolID string) {
+	prev, had, err := f.store.Odometer(ctx, jobTagCounter, uuid)
+	if err != nil {
+		f.fail("read the print count of tag "+uuid, err)
+
+		return
+	}
+
+	if had && prev.E == consumed {
+		return
+	}
+
+	if err = f.store.SetOdometer(ctx, jobTagCounter, uuid, store.Odometer{E: consumed}, time.Now()); err != nil {
+		f.fail("keep the print count of tag "+uuid, err)
+
+		return
+	}
+
+	if had && consumed > prev.E {
+		f.chargeJob(ctx, printerID, toolID, spoolID, consumed-prev.E)
+	}
+}
+
 func deviceOf(raw json.RawMessage) (string, bool) {
 	var envelope event.Envelope
 	if json.Unmarshal(raw, &envelope) != nil {
@@ -655,6 +765,8 @@ func (f *Follower) bindTool(ctx context.Context, printerID string, toolID connec
 				f.fail("clear the pending grams of spool "+sp.ID, err)
 			}
 
+			f.chargeTag(ctx, printerID, toolID, rep.InstanceUUID, *tool.ConsumedWeight, sp.ID)
+
 			left := math.Max(0, *rep.FullWeight-*tool.ConsumedWeight)
 			f.setGross(ctx, sp, math.Floor(left+sp.EmptyG))
 
@@ -665,6 +777,7 @@ func (f *Follower) bindTool(ctx context.Context, printerID string, toolID connec
 			// The tag counts what was used off it but holds no full weight: the
 			// weight a person gave is the start, and each rise of the count after
 			// it is charged.
+			f.chargeTag(ctx, printerID, toolID, rep.InstanceUUID, *tool.ConsumedWeight, sp.ID)
 			f.countConsumed(ctx, rep.InstanceUUID, *tool.ConsumedWeight, sp)
 
 			return Binding{Source: "tag", FilamentTypeID: sp.FilamentTypeID, SpoolID: sp.ID}
@@ -840,6 +953,8 @@ func (f *Follower) count(ctx context.Context, printerID string, toolID connector
 	if grams <= 0 {
 		return
 	}
+
+	f.chargeJob(ctx, printerID, toolID, sp.ID, grams)
 
 	if err = f.store.AddPending(ctx, sp.ID, grams); err != nil {
 		f.fail("count the filament of spool "+sp.ID, err)

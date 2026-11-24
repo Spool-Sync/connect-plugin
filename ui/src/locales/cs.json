@@ -438,5 +438,8 @@
   "materials.spoolPicker.noneOf": "Žádné cívky {material}. Vytvořte novou níže.",
   "materials.assign.elsewhereTitle": "Tato cívka je už zavedená",
   "materials.assign.elsewhere": "Je zavedená v {tool} tiskárny {printer}. Opravdu ji chcete zavést sem?",
-  "materials.assign.elsewhereConfirm": "Použít tuto cívku"
+  "materials.assign.elsewhereConfirm": "Použít tuto cívku",
+  "materials.job.none": "Pro tento tisk nebyl započítán žádný filament. Tisk se počítá jen tehdy, když modul tiskárnu sleduje.",
+  "materials.job.gone": "Mezitím smazaná cívka",
+  "materials.job.total": "Celkem"
 }

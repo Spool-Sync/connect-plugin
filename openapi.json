@@ -1232,6 +1232,89 @@
           }
         }
       }
+    },
+    "/jobs/usage": {
+      "get": {
+        "operationId": "read-jobs-usage",
+        "summary": "The filament some prints took",
+        "description": "The grams of filament each print named took, for the module's column in the Jobs listing. A print is the id Prusa Connect gives it. A print this module counted nothing for is absent. At most 200 prints at once. The host takes view_resource on the module's instance before this is called.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "description": "The prints' ids, joined with commas. A repeated id is read too.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 200
+            },
+            "style": "form",
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The prints' filament.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "usage"
+                  ],
+                  "properties": {
+                    "usage": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/JobTotal"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
+    },
+    "/jobs/{id}/usage": {
+      "get": {
+        "operationId": "read-job-usage",
+        "summary": "The filament one print took, spool by spool",
+        "description": "The grams of filament one print took off each spool, tool by tool, with each spool named, for the module's section on the print's page. A print this module counted nothing for answers no spools. The host takes view_resource on the module's instance before this is called.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The print's filament.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobUsage"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Refused"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2380,6 +2463,81 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "JobTotal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_id",
+          "grams"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "grams": {
+            "type": "number"
+          }
+        }
+      },
+      "JobUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job_id",
+          "grams",
+          "spools"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "grams": {
+            "type": "number",
+            "description": "The filament the print took, in grams."
+          },
+          "spools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tool",
+                "spool_id",
+                "name",
+                "brand",
+                "material",
+                "color_rgba",
+                "grams"
+              ],
+              "properties": {
+                "tool": {
+                  "type": "string",
+                  "description": "The tool's id, such as 0 or 1.2 for a slot."
+                },
+                "spool_id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Empty for a spool deleted since."
+                },
+                "brand": {
+                  "type": "string"
+                },
+                "material": {
+                  "type": "string"
+                },
+                "color_rgba": {
+                  "type": "string"
+                },
+                "grams": {
+                  "type": "number"
                 }
               }
             }

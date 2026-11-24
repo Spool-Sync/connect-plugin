@@ -30,6 +30,8 @@ export const operationTable = {
   "list-types": { id: "list-types", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/types", response: "json", anonymous: false },
   "merge-spool": { id: "merge-spool", method: "POST", path: "/api/v1/modules/com.github.aux.prusa3d.materials/spools/{id}/merge", body: "application/json", response: "json", anonymous: false },
   "read-catalogue": { id: "read-catalogue", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/catalogue", response: "json", anonymous: false },
+  "read-job-usage": { id: "read-job-usage", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/jobs/{id}/usage", response: "json", anonymous: false },
+  "read-jobs-usage": { id: "read-jobs-usage", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/jobs/usage", response: "json", anonymous: false },
   "read-overview": { id: "read-overview", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/overview", response: "json", anonymous: false },
   "read-status": { id: "read-status", method: "GET", path: "/api/v1/modules/com.github.aux.prusa3d.materials/status", response: "json", anonymous: false },
   "rename-location": { id: "rename-location", method: "PATCH", path: "/api/v1/modules/com.github.aux.prusa3d.materials/locations/{id}", body: "application/json", response: "json", anonymous: false },
@@ -323,6 +325,30 @@ export interface Operations {
   ): Promise<operations["read-catalogue"]["responses"][200]["content"]["application/json"]>;
 
   /**
+   * GET /api/v1/modules/com.github.aux.prusa3d.materials/jobs/{id}/usage
+   *
+   * The filament one print took, spool by spool
+   */
+  readJobUsage(
+    request: {
+      path: operations["read-job-usage"]["parameters"]["path"];
+    },
+    signal?: AbortSignal,
+  ): Promise<operations["read-job-usage"]["responses"][200]["content"]["application/json"]>;
+
+  /**
+   * GET /api/v1/modules/com.github.aux.prusa3d.materials/jobs/usage
+   *
+   * The filament some prints took
+   */
+  readJobsUsage(
+    request?: {
+      query?: operations["read-jobs-usage"]["parameters"]["query"];
+    },
+    signal?: AbortSignal,
+  ): Promise<operations["read-jobs-usage"]["responses"][200]["content"]["application/json"]>;
+
+  /**
    * GET /api/v1/modules/com.github.aux.prusa3d.materials/overview
    *
    * The stock at a glance
@@ -445,6 +471,8 @@ export function bindOperations(transport: Transport): Operations {
     listTypes: (request = {}, signal) => transport.call(operationTable["list-types"], request, signal),
     mergeSpool: (request, signal) => transport.call(operationTable["merge-spool"], request, signal),
     readCatalogue: (request = {}, signal) => transport.call(operationTable["read-catalogue"], request, signal),
+    readJobUsage: (request, signal) => transport.call(operationTable["read-job-usage"], request, signal),
+    readJobsUsage: (request = {}, signal) => transport.call(operationTable["read-jobs-usage"], request, signal),
     readOverview: (request = {}, signal) => transport.call(operationTable["read-overview"], request, signal),
     readStatus: (request = {}, signal) => transport.call(operationTable["read-status"], request, signal),
     renameLocation: (request, signal) => transport.call(operationTable["rename-location"], request, signal),
