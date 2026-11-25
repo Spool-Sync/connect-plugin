@@ -1,7 +1,9 @@
 // Copied from extensions/materials/internal/assign/rules.go in the prusa-connect
 // repository, by Prusa Research a.s., licensed under
 // OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1 (https://github.com/prusa3d/prusa-connect), as this module is.
-// Unchanged apart from this note.
+// Changed: an assign goes through while printing (it only records the spool
+// and starts its count; nothing is sent to the printer). An unassign is still
+// refused, as it stands for unloading the filament.
 // Package assign holds the rules for when a person may change the material
 // on a printer tool.
 package assign
@@ -155,8 +157,14 @@ func refusedState(s State, t Tool) Reason {
 	return WhileBusy
 }
 
-// MayAssign says whether a person may put candidate on the tool.
+// MayAssign says whether a person may put candidate on the tool. A print does
+// not refuse it: the assignment is a record, and the print goes on. The
+// material the tool reports is still checked.
 func MayAssign(s State, t Tool, c Candidate) Reason {
+	if s == Printing {
+		s = Standby
+	}
+
 	if r := refusedState(s, t); r != Allowed {
 		return r
 	}

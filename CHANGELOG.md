@@ -14,6 +14,13 @@ first. `version:` in `module.yaml` is the newest heading below.
   (prusa3d/prusa-connect#80); until a release has them, `go.mod` builds
   against that pull request's SDK.
 
+### Changed
+
+- **Assign during a print**: a spool can be assigned to a tool while the
+  printer prints or is paused. The print goes on: the assignment is a record
+  and the count starts from that moment. The reported-material and NFC checks
+  still apply, and unassign and unload stay refused until the print ends.
+
 ## 0.2.0 - 2026-11-23
 
 ### Added

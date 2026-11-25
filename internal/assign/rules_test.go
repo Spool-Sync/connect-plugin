@@ -1,7 +1,7 @@
 // Copied from extensions/materials/internal/assign/rules_test.go in the prusa-connect
 // repository, by Prusa Research a.s., licensed under
 // OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1 (https://github.com/prusa3d/prusa-connect), as this module is.
-// Unchanged apart from this note.
+// Changed: an assign goes through while printing; an unassign does not.
 package assign
 
 import (
@@ -68,8 +68,9 @@ func TestMayAssign(t *testing.T) {
 		{"another material", true, "IDLE", reported("PETG"), material("PLA"), ReportedLoaded},
 		{"nothing reported", true, "IDLE", Tool{Reports: true}, material("PLA"), ReportedEmpty},
 		{"candidate without abbreviation", true, "IDLE", reported("PETG"), material(""), ReportedLoaded},
-		{"reporter in PRINTING", true, "PRINTING", reported("PETG"), material("PETG"), WhilePrinting},
-		{"reporter in PAUSED", true, "PAUSED", reported("PETG"), material("PETG"), WhilePrinting},
+		{"reporter in PRINTING", true, "PRINTING", reported("PETG"), material("PETG"), Allowed},
+		{"another material in PRINTING", true, "PRINTING", reported("PETG"), material("PLA"), ReportedLoaded},
+		{"reporter in PAUSED", true, "PAUSED", reported("PETG"), material("PETG"), Allowed},
 		{"reporter in BUSY", true, "BUSY", reported("PETG"), material("PETG"), WhileBusy},
 		{"reporter in MANIPULATING", true, "MANIPULATING", reported("PETG"), material("PETG"), WhileBusy},
 		{"reporter in ATTENTION", true, "ATTENTION", reported("PETG"), material("PETG"), WhileBusy},
@@ -91,8 +92,8 @@ func TestMayAssign(t *testing.T) {
 		{"non-reporter in STOPPED", true, "STOPPED", notReporting(), material("PLA"), Allowed},
 		{"non-reporter in BUSY", true, "BUSY", notReporting(), material("PLA"), Allowed},
 		{"non-reporter in MANIPULATING", true, "MANIPULATING", notReporting(), material("PLA"), Allowed},
-		{"non-reporter in PRINTING", true, "PRINTING", notReporting(), material("PLA"), WhilePrinting},
-		{"non-reporter in PAUSED", true, "PAUSED", notReporting(), material("PLA"), WhilePrinting},
+		{"non-reporter in PRINTING", true, "PRINTING", notReporting(), material("PLA"), Allowed},
+		{"non-reporter in PAUSED", true, "PAUSED", notReporting(), material("PLA"), Allowed},
 		{"non-reporter in ATTENTION", true, "ATTENTION", notReporting(), material("PLA"), WhileBusy},
 		{"non-reporter in ERROR", true, "ERROR", notReporting(), material("PLA"), WhileBusy},
 		{"non-reporter in UNKNOWN", true, "UNKNOWN", notReporting(), material("PLA"), WhileBusy},
@@ -100,9 +101,10 @@ func TestMayAssign(t *testing.T) {
 		{"non-reporter in SOMETHING_NEW", true, "SOMETHING_NEW", notReporting(), material("PLA"), WhileBusy},
 		{"custom name takes any material", true, "IDLE", reported("CUSTOM1"), material("PLA"), Allowed},
 		{"custom name takes a catalogue spool", true, "IDLE", reported("CUSTOM1"), material("PETG"), Allowed},
-		// Printing locks every action regardless of capability
-		{"printing on a reporter", true, "PRINTING", Tool{Reports: true}, material("PLA"), WhilePrinting},
-		{"printing on a non-reporter", true, "PRINTING", Tool{}, material("PLA"), WhilePrinting},
+		// A print does not lock an assign: the reported material still counts
+		{"printing on a reporter", true, "PRINTING", Tool{Reports: true}, material("PLA"), ReportedEmpty},
+		{"printing on a non-reporter", true, "PRINTING", Tool{}, material("PLA"), Allowed},
+		{"printing off an NFC tag", true, "PRINTING", Tool{Reports: true, Reported: new("PLA"), FromNFC: true}, material("PLA"), ReadOffTag},
 		// Reporting printer (MK4), offline allows assign and remove
 		{"reporter offline", false, "", Tool{Reports: true}, material("PLA"), Allowed},
 		// Reporting printer (MK4), online and empty allows only remove

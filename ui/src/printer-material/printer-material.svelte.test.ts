@@ -488,7 +488,7 @@ describe('the material section', () => {
       {
         [TOOLS]: [
           printer([assigned]),
-          printer([{ ...assigned, assign: 'printing', unassign: 'printing' }], {
+          printer([{ ...assigned, assign: '', unassign: 'printing' }], {
             state: 'PRINTING',
           }),
         ],
@@ -504,12 +504,13 @@ describe('the material section', () => {
       { id: 'core', connected: true, state: { '/state': 'PRINTING' } },
     ] as unknown as Device[];
 
+    // An assign goes on through a print; only the unload waits for it.
     await expect
-      .element(page.getByText(/Cannot assign material while printing/))
+      .element(page.getByText(/Cannot unload while printing/))
       .toBeInTheDocument();
     await expect
       .element(page.getByRole('button', { name: 'Change' }))
-      .toBeDisabled();
+      .toBeEnabled();
     expect(stub.calls.filter((c) => c.url === TOOLS)).toHaveLength(2);
   });
 
@@ -572,7 +573,7 @@ describe('the material section', () => {
     expect(stub.calls.map((c) => c.url)).toEqual([TOOLS]);
   });
 
-  it('says why a change is refused while printing and off a tag', async () => {
+  it('assigns while printing and says why the rest is refused', async () => {
     const stub = started({
       [TOOLS]: [
         printer(
@@ -580,7 +581,7 @@ describe('the material section', () => {
             tool('0', {
               assignment: assignment(),
               reported: reported({ abbreviation: 'PLA' }),
-              assign: 'printing',
+              assign: '',
               unassign: 'printing',
               active: true,
             }),
@@ -600,7 +601,7 @@ describe('the material section', () => {
     // The reasons are behind each tile's info mark.
     await expect
       .element(page.getByText(/Cannot assign material while printing/))
-      .toBeInTheDocument();
+      .not.toBeInTheDocument();
     await expect
       .element(page.getByText(/Cannot unload while printing/))
       .toBeInTheDocument();
@@ -612,9 +613,9 @@ describe('the material section', () => {
     await expect
       .element(page.getByTitle('Read from the spool NFC tag by the printer'))
       .toBeVisible();
-    for (const button of page.getByRole('button', { name: 'Change' }).all()) {
-      await expect.element(button).toBeDisabled();
-    }
+    await expect
+      .element(page.getByRole('button', { name: 'Change' }))
+      .toBeEnabled();
     // A connected printer's head unloads rather than unassigns.
     await expect
       .element(page.getByRole('button', { name: 'Unload' }))

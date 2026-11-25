@@ -603,16 +603,20 @@ func TestAssignAndUnassignAndTheSpoolOnAnotherTool(t *testing.T) {
 	}
 }
 
-// A printing printer refuses a change, and an empty tool refuses a material when the
-// printer reports it empty.
+// A printing printer takes an assign without stopping the print, and refuses an
+// unassign, which stands for unloading the filament.
 func TestTheRulesRefuseAChangeWhilePrinting(t *testing.T) {
 	r := newRig(t, printerWith("PRINTING", map[string]map[string]any{"0": {}}))
 	r.access = allow{"user:alpha operate p1": true, "user:alpha observe p1": true}
 	r.svc.access = r.access
 
-	rec := r.call(t, "PUT", "/printers/p1/tools/0", `{"material_uuid":"ft1"}`, "user:alpha")
+	if rec := r.call(t, "PUT", "/printers/p1/tools/0", `{"material_uuid":"ft1"}`, "user:alpha"); rec.Code != http.StatusOK {
+		t.Fatalf("an assign while printing answered %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec := r.call(t, "DELETE", "/printers/p1/tools/0", "", "user:alpha")
 	if code(t, rec) != "spool-sync/TOOL_REFUSED" || decode(t, rec)["params"].(map[string]any)["reason"] != "printing" {
-		t.Fatalf("a change while printing answered %s", rec.Body.String())
+		t.Fatalf("an unassign while printing answered %s", rec.Body.String())
 	}
 }
 

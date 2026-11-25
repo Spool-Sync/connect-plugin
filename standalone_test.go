@@ -34,7 +34,7 @@ func seededLocal(t *testing.T, db *sql.DB, log *slog.Logger) *local.Inventory {
 // answers what one on SpoolSync answers.
 func TestStandalone(t *testing.T) {
 	cases := map[string]func(*testing.T){
-		"the rules refuse a change while printing": TestTheRulesRefuseAChangeWhilePrinting,
+		"the rules take an assign but refuse an unassign while printing": TestTheRulesRefuseAChangeWhilePrinting,
 		"locations":                        TestLocationsRules,
 		"favourites and list filters":      TestFavouritesAndListFilters,
 		"add reported needs a tag":         TestAddReportedNeedsATag,
