@@ -3,7 +3,19 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
-## Unreleased
+## 0.2.1 - 2026-11-27
+
+### Fixed
+
+- **Egress declared in full** (marketplace review of 0.2.0): `module.yaml`
+  now declares `github.com` and `codeload.github.com` on port 443, the hosts
+  the OpenPrintTag catalogue import downloads from (GitHub redirects the
+  archive to codeload). The `spoolsync_url` entry's `sends` now lists all of
+  the printer report: each printer's Connect ID, name, serial number, model,
+  status, active tool, the spool in each slot, and the current job's name,
+  progress and time remaining.
+- The `spoolsync_url` option recommends https, as an http:// address sends
+  the SpoolSync token unencrypted.
 
 ### Added
 

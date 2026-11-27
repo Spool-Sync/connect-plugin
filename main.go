@@ -63,7 +63,7 @@ const name = "spool-sync-prusa-connect"
 // version is module.yaml's version. scripts/release.sh overwrites it with
 // -ldflags "-X main.version=...", so a dev build answers the version its
 // archive's manifest carries, such as 0.1.0-dev.4.
-var version = "0.2.0"
+var version = "0.2.1"
 
 var release = extension.Version(version)
 

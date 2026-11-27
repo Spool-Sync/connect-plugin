@@ -16,7 +16,7 @@ name: spool-sync-prusa-connect
 # The kind the one instance is declared under. It offers the service runtime,
 # which is what a module with a process needs.
 kind: sink
-version: 0.2.0
+version: 0.2.1
 # The licence this module is released under. The marketplace shows it and
 # refuses a release without one. An SPDX identifier is the usual form.
 license: OCL v1.1 + Micro v1 + NoSaaS v1 + SWAtt v1
@@ -46,7 +46,7 @@ options:
   - key: spoolsync_url
     type: url
     required: false
-    summary: The address of the SpoolSync server, such as https://spools.example.net, without /api/v1. Leave it and the token empty to run standalone, with the inventory in the module's own database.
+    summary: The address of the SpoolSync server, such as https://spools.example.net, without /api/v1. Use https; an http:// address sends the SpoolSync token unencrypted. Leave it and the token empty to run standalone, with the inventory in the module's own database.
   - key: spoolsync_token
     type: secret
     required: false
@@ -68,11 +68,22 @@ require:
 needs:
   database: true
 
-# The one connection outside Prusa Connect: the SpoolSync server the operator names.
+# The connections outside Prusa Connect: the SpoolSync server the operator
+# names, and GitHub for the OpenPrintTag material catalogue a standalone
+# module imports (internal/catalogue, DefaultURL). GitHub answers the archive
+# URL with a redirect to codeload.github.com, so both hosts are declared.
 egress:
   - option: spoolsync_url
     why: Reads and edits the operator's SpoolSync spools and filament types, sets the weight of each spool on a printer tool, and follows the slots and weights a person changes in SpoolSync.
-    sends: The spools a person adds or edits, the OpenPrintTag instance UUID of tagged spools, each spool's weight in grams, and the printers and the spool in each slot.
+    sends: "Spools a person adds or edits, tagged spools' OpenPrintTag instance UUID, each spool's weight in grams, and for each printer its Connect ID, name, serial number, model, status, active tool and the spool in each slot, and the current job's name, progress and time remaining."
+  - host: github.com
+    ports: [443]
+    why: Downloads the OpenPrintTag material database (OpenPrintTag/openprinttag-database, main branch as a ZIP) when a person imports the catalogue into a standalone inventory.
+    sends: One HTTPS GET for the public archive. No token, spool, printer or other inventory data is sent.
+  - host: codeload.github.com
+    ports: [443]
+    why: GitHub redirects the OpenPrintTag database archive download from github.com here; the module follows that redirect to fetch the ZIP.
+    sends: One HTTPS GET for the public archive. No token, spool, printer or other inventory data is sent.
 
 # Read every printer and its event stream, to follow the spool on each tool.
 permissions:
