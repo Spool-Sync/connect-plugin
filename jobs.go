@@ -31,9 +31,37 @@ type jobSpool struct {
 	Grams     float64 `json:"grams"`
 }
 
+// observedUses leaves out the rows of printers the caller may not observe, as
+// GET /printers/tools does. A host that cannot answer refuses the whole read.
+func (s *service) observedUses(w http.ResponseWriter, r *http.Request, by string, uses []store.JobUse) ([]store.JobUse, bool) {
+	seen := map[string]bool{}
+	out := make([]store.JobUse, 0, len(uses))
+
+	for _, u := range uses {
+		observe, asked := seen[u.PrinterID]
+		if !asked {
+			var err error
+			observe, _, err = s.rights(r.Context(), by, u.PrinterID)
+			if err != nil {
+				refuse(w, AccessUnknown, "", nil)
+
+				return nil, false
+			}
+
+			seen[u.PrinterID] = observe
+		}
+
+		if observe {
+			out = append(out, u)
+		}
+	}
+
+	return out, true
+}
+
 // jobsUsage is GET /jobs/usage?id=..: the filament each print named took. A
 // print this module counted nothing for is absent.
-func (s *service) jobsUsage(w http.ResponseWriter, r *http.Request, _ string) {
+func (s *service) jobsUsage(w http.ResponseWriter, r *http.Request, by string) {
 	// The browser's client joins a list with commas; a repeated id is read too.
 	var ids []string
 
@@ -59,6 +87,11 @@ func (s *service) jobsUsage(w http.ResponseWriter, r *http.Request, _ string) {
 		return
 	}
 
+	uses, ok := s.observedUses(w, r, by, uses)
+	if !ok {
+		return
+	}
+
 	totals := map[string]float64{}
 	for _, u := range uses {
 		totals[u.JobID] += u.Grams
@@ -76,13 +109,18 @@ func (s *service) jobsUsage(w http.ResponseWriter, r *http.Request, _ string) {
 
 // jobUsage is GET /jobs/{id}/usage: the filament one print took, tool by tool
 // and spool by spool, with the spools named.
-func (s *service) jobUsage(w http.ResponseWriter, r *http.Request, _ string) {
+func (s *service) jobUsage(w http.ResponseWriter, r *http.Request, by string) {
 	id := r.PathValue("id")
 
 	uses, err := s.st.JobUsage(r.Context(), []string{id})
 	if err != nil {
 		s.storeFailed(w, r, err)
 
+		return
+	}
+
+	uses, ok := s.observedUses(w, r, by, uses)
+	if !ok {
 		return
 	}
 

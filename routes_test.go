@@ -879,6 +879,9 @@ func TestTheOverviewTotalsTheStockByMaterialAndType(t *testing.T) {
 
 func TestTheJobsAnswerTheFilamentEachPrintTook(t *testing.T) {
 	r := newRig(t, printerWith("IDLE", nil))
+	r.access = allow{"user:alpha observe p1": true}
+	r.svc.access = r.access
+
 	r.call(t, "POST", "/spools", `{"material_uuid":"ft1","remaining_weight_g":800,"quantity":1}`, "user:alpha")
 
 	spools := decode(t, r.call(t, "GET", "/spools", "", "user:alpha"))["spools"].([]any)
@@ -916,5 +919,43 @@ func TestTheJobsAnswerTheFilamentEachPrintTook(t *testing.T) {
 
 	if rec := r.call(t, "GET", "/jobs/job-9/usage", "", "user:alpha"); len(decode(t, rec)["spools"].([]any)) != 0 {
 		t.Fatalf("a print with nothing counted answered %s", rec.Body.String())
+	}
+}
+
+// The jobs answer only the filament of printers the caller may observe, as the
+// tools list does.
+func TestTheJobsLeaveOutPrintersThePersonMayNotObserve(t *testing.T) {
+	r := newRig(t, printerWith("IDLE", nil))
+	r.access = allow{"user:alpha observe p1": true}
+	r.svc.access = r.access
+
+	for _, use := range []struct {
+		job     string
+		printer string
+		spool   string
+		grams   float64
+	}{{"job-1", "p1", "s1", 10}, {"job-1", "p2", "s2", 90}, {"job-2", "p2", "s2", 5}} {
+		if err := r.svc.st.AddJobUsage(t.Context(), use.job, use.printer, "0", use.spool, use.grams); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	totals := decode(t, r.call(t, "GET", "/jobs/usage?id=job-1%2Cjob-2", "", "user:alpha"))["usage"].([]any)
+	if len(totals) != 1 || totals[0].(map[string]any)["job_id"] != "job-1" || totals[0].(map[string]any)["grams"] != 10.0 {
+		t.Fatalf("the totals are %v, want job-1 at 10 g alone", totals)
+	}
+
+	detail := decode(t, r.call(t, "GET", "/jobs/job-1/usage", "", "user:alpha"))
+	if detail["grams"] != 10.0 || len(detail["spools"].([]any)) != 1 {
+		t.Fatalf("the breakdown is %v, want 10 g on one visible printer", detail)
+	}
+
+	if got := decode(t, r.call(t, "GET", "/jobs/usage?id=job-1%2Cjob-2", "", "user:nobody"))["usage"].([]any); len(got) != 0 {
+		t.Fatalf("a person who may observe nothing sees %v", got)
+	}
+
+	hidden := decode(t, r.call(t, "GET", "/jobs/job-1/usage", "", "user:nobody"))
+	if hidden["grams"] != 0.0 || len(hidden["spools"].([]any)) != 0 {
+		t.Fatalf("a person who may observe nothing sees %v", hidden)
 	}
 }

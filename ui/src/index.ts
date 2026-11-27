@@ -4,14 +4,11 @@
 // `defineModule` is an identity function. It exists so an author gets the
 // host's types at this call site without importing the host.
 import { defineModule } from '@prusa/connect-ui/slots';
-import type { Component } from 'svelte';
 
 import { mayOperate } from './access';
 import { materialsOn } from './api';
 import { Catalogue, holdCatalogue } from './catalogue.svelte';
 import { CatalogueSettings } from './catalogue-settings';
-import JobCell from './job-filament/job-cell.svelte';
-import JobSection from './job-filament/job-section.svelte';
 import { LocationsSettings } from './locations-settings';
 import { holdHost } from './host';
 import { holdList, MaterialList } from './list.svelte';
@@ -54,15 +51,9 @@ export default defineModule((host) => {
   host.register.deviceTab('tools', PrinterMaterial);
   host.register.component('printer-positions', PrinterMaterial);
 
-  // The filament each print took (ADR-20261123-wfw). A Prusa Connect without
-  // the job slots offers no way to register them, and the module works on
-  // without them.
-  const jobs = host.register as Partial<
-    Record<
-      'jobColumn' | 'jobSection',
-      (id: string, component: Component<{ jobId: string }>) => void
-    >
-  >;
-  jobs.jobColumn?.('filament', JobCell);
-  jobs.jobSection?.('filament', JobSection);
+  // The filament each print took (ADR-20261123-wfw) stays out until a Prusa
+  // Connect release declares the job slots (prusa3d/prusa-connect#80). A core
+  // that does not know a contribution refuses the module that registers it, so
+  // neither this bundle nor module.yaml names one yet. The components and the
+  // jobs routes remain for when it does.
 });

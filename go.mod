@@ -2,7 +2,7 @@ module github.com/spool-sync/connect-plugin
 
 go 1.26.11
 
-require github.com/prusa3d/prusa-connect/sdk v0.1.0-beta.1
+require github.com/prusa3d/prusa-connect/sdk v0.1.0-beta.2
 
 require (
 	github.com/coder/websocket v1.8.15
@@ -22,5 +22,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
-
-replace github.com/prusa3d/prusa-connect/sdk => github.com/DomiiBunn/prusa-connect/sdk v0.0.0-20261124013040-3c5637e8b129

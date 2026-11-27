@@ -3,6 +3,24 @@
 What an operator sees change when they upgrade this module, newest release
 first. `version:` in `module.yaml` is the newest heading below.
 
+## 0.2.2 - 2026-11-27
+
+### Fixed
+
+- **The manifest installs on a released core** (marketplace review of 0.2.1):
+  0.2.1 declared `ui.contributes.job_column` and `job_section`, which no
+  released Prusa Connect knows yet (prusa3d/prusa-connect#80 is not in
+  0.1.0-beta.2), so the host refused the manifest. Those contributions are
+  gone from this release. The filament-per-print endpoints remain; the Jobs
+  column and print section are not registered, and return once a release
+  carries the slots, requiring that core version.
+- **The jobs answer only what the caller may see**: `GET /jobs/usage` and
+  `GET /jobs/{id}/usage` leave out the rows of printers the caller may not
+  observe, as `GET /printers/tools` does.
+- The module builds against the official
+  `github.com/prusa3d/prusa-connect/sdk` v0.1.0-beta.2, with no `go.mod`
+  replace to a fork.
+
 ## 0.2.1 - 2026-11-27
 
 ### Fixed
